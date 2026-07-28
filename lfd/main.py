@@ -85,6 +85,7 @@ for p in range(p_start,4):
                 if exist and not retrain:
                     with open(tpgmm_file_path, 'rb') as outp:                        
                         tpgmm = pickle.load(outp)
+                        print(type(tpgmm))
                         assert isinstance(tpgmm, TPGMM)
                         num_of_gauss = tpgmm.num_of_gauss
                         LL = tpgmm.converged_LL

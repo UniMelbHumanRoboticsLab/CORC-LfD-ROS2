@@ -88,5 +88,5 @@ def assign_stars(df,p_column):
             df[p_column] < 0.05,
         ],
         ["***", "**", "*"],
-        default=""
+        default=" "
     )

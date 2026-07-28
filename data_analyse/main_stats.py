@@ -27,18 +27,16 @@ subjects = [
 fig = plt.figure(figsize=((9)*0.393701,7.1*0.393701),num="all stats",layout="constrained")
 fig2 = plt.figure(figsize=((9)*0.393701,7.5*0.393701),num="all stats res",layout="constrained")
 i = 0
-    
 
-
-for eval_id,eval_name in zip(["val","test"],["Seen","Unseen"]):
-    for metric_id,metric_name in zip(["avg_norm_error_mean","norm_diff_tau_mean","coverage_mean"],[r"$\epsilon$",r"$\Delta\tau_{peak}$", r"$C~(\%)$" ]):    
+for metric_id,metric_name in zip(["avg_norm_error_mean","norm_diff_tau_mean","coverage_mean"],[r"$\epsilon$",r"$\Delta\tau_{peak}$", r"$C~(\%)$" ]):    
+    for eval_id,eval_name in zip(["val","test"],["Seen","Unseen"]):
         # prep the data for stats
         stats_samples = []
         for p in range(1,4):
             for sub in subjects[p-1]:
 
                 session_data = {
-                    "exp_id":"exp1_trained2",
+                    "exp_id":"exp1_tnsre_trained4",
                     "patient_id":f"p{p}",
                     "subject_id":f"sub{sub}",
                 }
@@ -147,8 +145,9 @@ for eval_id,eval_name in zip(["val","test"],["Seen","Unseen"]):
         post_hoc.rename(columns={"dof": "df"}, inplace=True)
         
         # compile all the stats
-        print(aov[["Source","SS","df1","df2","MS","F","P-val"]][0:3])
-        aovT = aov[["SS","df1","df2","MS","F","P-val"]][0:3].T
+        col = f"{eval_name} {metric_name}"
+        print(aov[["Source","SS","df1","df2","MS","F","P-val"]])
+        aovT = aov[["SS","df1","df2","MS","F","P-val"]].T
         # series of functions to restructure the df
         aovT = (
             aovT.reset_index(names="metric")  # make index into a column "metric"
@@ -158,8 +157,8 @@ for eval_id,eval_name in zip(["val","test"],["Seen","Unseen"]):
                 .rename(columns={"metric": "column"})
         )
         
-        print(post_hoc[["Contrast","T","df","P-val"]][0:4])
-        phT = post_hoc[["T","df","P-val"]][0:4].T
+        print(post_hoc[["Contrast","T","df","P-val"]])
+        phT = post_hoc[["T","df","P-val"]].T
         phT = (
             phT.reset_index(names="metric")  # make index into a column "metric"
                 .melt(id_vars="metric", var_name="src_idx", value_name=f"{eval_name} {metric_name}")
@@ -168,54 +167,26 @@ for eval_id,eval_name in zip(["val","test"],["Seen","Unseen"]):
                 .rename(columns={"metric": "column"})
         )
         
+        sec_aovT = aov[["Source","stars"]].iloc[[1]].rename(columns={"Source": "id"})
+        sec_phT = post_hoc[["patient","stars"]][4:].rename(columns={"patient": "id"})
+        sec_phT = pd.concat([sec_aovT, sec_phT]).reset_index(drop=True).rename(columns={"stars": col})
+        
         if i == 0:
-            aov_full = aovT[["Category", "column", f"{eval_name} {metric_name}"]]
+            aov_full = aovT[["Category", "column", col]]
             aov_full["Stat Test"] = "RM-ANOVA"
             aov_full = aov_full[["Stat Test","Category", "column", f"{eval_name} {metric_name}"]]
             
-            fph_full = phT[["Category", "column", f"{eval_name} {metric_name}"]]
+            fph_full = phT[["Category", "column", col]]
             fph_full["Stat Test"] = "Post-Hoc"
             fph_full = fph_full[["Stat Test","Category", "column", f"{eval_name} {metric_name}"]]
+            
+            fph_sec = sec_phT
 
         else:
-            col = f"{eval_name} {metric_name}"
+            
             aov_full[col] = aovT[col].to_numpy()        
             fph_full[col] = phT[col].to_numpy()        
-            # 
-
-        # # plot significance 
-        # df = post_hoc[["Contrast","patient","A","B","p_unc","p_corr","stars"]][0:4]
-        # labels = df["A"] + f"-" + df["B"]
-        # y = np.arange(len(df))
-        # height = 0.6
-        # ax2 = fig.add_subplot(2, 6, 6 + id)
-        # # Horizontal bars
-        # bars = ax2.barh(y, df["p_corr"], height=height, color="steelblue", label="Corrected p")
-        
-        # ax2.set_xlabel("p-value")
-        # if id == 1:
-        #     ax2.set_yticklabels(labels)
-        #     ax2.set_yticks(y)
-        #     ax2.set_ylabel("Comparison")
-        #     ax1.set_ylabel("Frequency")
-        # else:
-        #     ax2.yaxis.set_visible(False)
-        
-        # # Optional: smallest at top, largest at bottom (comment out if not wanted)
-        # ax2.invert_yaxis()
-        
-        # # Add stars to the right of bars
-        # for j, (bar, star) in enumerate(zip(bars, df["stars"])):
-        #     if isinstance(star, str) and star.strip():
-        #         x = bar.get_width()
-        #         y_text = bar.get_y() + bar.get_height() / 2
-        #         ax2.text(
-        #             x + 0.01,  # small offset to the right
-        #             y_text,
-        #             f"{star} ({df['p_corr'].iloc[j]:.4f})",
-        #             va="center",
-        #             ha="left"
-        #         )
+            fph_sec[col] = sec_phT[col].to_numpy()
         
         # set unseen variations to yellow color
         if eval_name == "Unseen":
@@ -226,6 +197,8 @@ for eval_id,eval_name in zip(["val","test"],["Seen","Unseen"]):
 
 full_stats_df = pd.concat([aov_full,fph_full])
 full_stats_df.to_csv('figures/all_stats.csv')
+fph_sec = fph_sec.set_index('id')
+fph_sec.to_csv('figures/secondary_stats.csv')
 fig.set_constrained_layout_pads(
     w_pad=0.05,   # padding around axes (inches)
     h_pad=0.05,
@@ -239,9 +212,9 @@ fig2.set_constrained_layout_pads(
     hspace=0.0
 )
 
-fig.savefig(f'figures/res_dist.svg')
-fig2.savefig(f'figures/qq.svg')
-plt.show()
+# fig.savefig(f'figures/res_dist.svg')
+# fig2.savefig(f'figures/qq.svg')
+# plt.show()
 # plt.close()
 
 

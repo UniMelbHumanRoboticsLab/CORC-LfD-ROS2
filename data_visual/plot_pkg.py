@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+
 fontsize = 8
 plt.rcParams.update({'font.size': fontsize})
 import warnings
@@ -11,6 +12,8 @@ from scipy import stats
 import numpy as np
 
 import sys,os
+sys.path.append(os.path.join(os.path.dirname(__file__)))
+from curlyBrace import curlyBrace
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from data_process.file_util_pkg import split_reps
 from data_analyse.stats_pkg import compute_central_tendency,remove_outliers_iqr,compute_CI_scale
@@ -714,7 +717,8 @@ def plot_violins(
     violin_width=0.4,
     prev_fig=None,prev_axs=None,
     remove_outlier=True,
-    split=1
+    split=1,
+    significance_set = None
 ):
     """
     Create smooth violin plot with matplotlib using manual KDE and extended tails.
@@ -771,7 +775,6 @@ def plot_violins(
                             (1.0, 0.48627450980392156, 0.0)
                             ]
     else:
-        # colors = get_n_colors(len(x_list),split,color_set,shuffle)
         colors = get_n_colors(len(x_labels),split)
         
         if split != 1:
@@ -812,24 +815,50 @@ def plot_violins(
     # standardize the scale for every axis
     all_data = np.concatenate([arr for sublist in cleaned_set_data for arr in sublist])
     data_range = np.max(all_data) - np.min(all_data)
-        
-    for ax,set_data,ax_title in zip(axs,cleaned_set_data,axis_title):
-        # Customize plot
+    
+    if significance_set == None:
+        significance_set = [[] for i in range(len(cleaned_set_data))]
+    # plot each set
+    for ax,set_data,ax_title,significances in zip(axs,cleaned_set_data,axis_title,significance_set):
+        # set x position
         ax.set_xticks(positions)
         
+        # Set ylabel if necessary
         if figwidth>=7:
             ax.set_ylabel(ax_title, fontsize=fontsize)
         
-        limits = [np.min(all_data), np.max(all_data)]
         # Add padding to y-axis
+        limits = [np.min(all_data), np.max(all_data)]
         ax.set_ylim(limits[0] - data_range * 0.25,limits[1] + data_range * 0.1)
+        # ax.set_ylim(limits[0],limits[1])
         
         # Add grid
         ax.yaxis.grid(True, linestyle='--', alpha=0.3, zorder=0)
         ax.set_axisbelow(True)
+        
+        # set the significance
+        if len(significances) > 0:
+            ax_xlim = list(ax.get_xlim())
+            ax_ylim = list(ax.get_ylim())
+            for j,significance in enumerate(significances):
+                if significance != " " and significance_set[0][j] != " ":
+                    if len(set_data)/split % 2 ==0:
+                        j_map = j*(split)
+                    else:
+                        j_map = j*(split+1)
+                    
+                    p1 = [positions[j_map],limits[0]- data_range * 0.1]
+                    p2 = [positions[j_map+1],limits[0]- data_range * 0.1]
+                    font = {'family': 'serif',
+                        'color':  'k',
+                        'weight': 'bold',
+                        'style': 'italic',
+                        'size': 10,
+                        }
+                    curlyBrace(fig, ax,p2, p1, 0.05, bool_auto=True, str_text=f"{significance}", color='k', lw=1, int_line_num=1,fontdict=font,axs_lim=[ax_xlim,ax_ylim])
 
-        if len(x_labels)>1:
-            # fill the split area for different cases
+        # fill the split area for different cases
+        if split>1:
             mid_pos = int(len(x_labels)/split)
             mid_pos_x = (positions[mid_pos]+positions[mid_pos-1])/2
             ax.fill_betweenx(
@@ -843,7 +872,7 @@ def plot_violins(
                 zorder=0,
                 label="Unseen Variations"
             )
-            if "Coverage" in title:
+            if r"$C~(\%)$" in title:
                 ax.plot([positions[0]-0.5, positions[-1]+0.5], 
                        [50, 50], 
                        color='black',
@@ -857,7 +886,7 @@ def plot_violins(
                        linestyle=':',
                        linewidth=2, 
                        zorder=4)
-        
+                    
         # Draw each violin with manual KDE
         cur_x_labels = []
         for i, (pos, data, color) in enumerate(zip(positions, set_data, colors)):
@@ -988,20 +1017,20 @@ def plot_violins(
                     zorder=2                               # Layer order
                 )
                 ax.add_patch(quartile_box)
-    
-
+        
+        # set the xaxis labels
         if show_central_tendency:
-            ax.set_xticklabels(cur_x_labels, rotation=0, ha='center',fontsize=fontsize)
             # for xtick, color in zip(ax.get_xticklabels(), colors):
             #     xtick.set_color(color)
+            ax.set_xticklabels(cur_x_labels, rotation=0, ha='center',fontsize=fontsize)
         else:
             ax.set_xticklabels(x_labels, rotation=0, ha='center')
 
-    
     # Create legend
     legend_elements = []
-    handles, labels = axs[0].get_legend_handles_labels()
-    legend_elements.append(handles[0])
+    if split>1:
+        handles, labels = axs[0].get_legend_handles_labels()
+        legend_elements.append(handles[0])
     legend_elements.append(
         Line2D([0], [0], linestyle=':',linewidth=2, color='black', label='Perfomance Boundary')
     )
@@ -1041,9 +1070,9 @@ def plot_violins(
         wspace=0.05,  # space between subplot groups (fraction)
         hspace=0.0
     )
-    if "Error" in title:
+    if r"$\epsilon$" in title:
         fig.savefig(f'figures/err.svg')
-    elif "Coverage" in title:
+    elif r"$C~(\%)$" in title:
         fig.savefig(f'figures/cover.svg')
     else:
         fig.savefig(f'figures/tau.svg')
