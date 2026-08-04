@@ -15,7 +15,7 @@ from data_process.file_util_pkg import create_dir,compile_train_val_test_data
 from data_analyse.stats_pkg import compute_central_tendency
 import matplotlib.pyplot as plt
 
-plt_results = False
+plt_results = True
 retrain = False
 # retrain = True
 deploy = True
@@ -35,20 +35,15 @@ total_monte = 4
 # 4 train var - 6 combinations (prev), 7 (current)
 # 5 train var - 6 combinations
 
-for train_var_num,total_combi in zip([4,5],[7,6]):
+for train_var_num,total_combi in zip([2,3],[2,10]):
     for p in range(p_start,4):
         total_time = 0
-        if p == 1:
-            sm_num = 2
-        else:
-            sm_num=4
             
         for sub in range(sub_start,25):
             session_data = {
                 "exp_id":f"exp1_trained_{train_var_num}",
                 "patient_id":f"p{p}",
                 "subject_id":f"sub{sub}",
-                "sbmvmt_num":sm_num,
                 "num_rep":4,
                 "variants":["var_1","var_2","var_3","var_4","var_5","var_6"] #
             }
@@ -86,23 +81,23 @@ for train_var_num,total_combi in zip([4,5],[7,6]):
                         with open(tpgmm_file_path, 'rb') as outp:                        
                             tpgmm = pickle.load(outp)
                         print(type(tpgmm))
-                            assert isinstance(tpgmm, TPGMM)
-                            num_of_gauss = tpgmm.num_of_gauss
-                            LL = tpgmm.converged_LL
-                            
-                            if len(LL) > 1:
-                                print(f"{tpgmm.model_id} found")
-                                stat_info = os.stat(tpgmm_file_path)
-                                creation_time = stat_info.st_mtime
-                                readable_time = datetime.fromtimestamp(creation_time)
-                                print(f"File created: {readable_time}")
-                                color = GREEN if tpgmm.training_status == "Success" else RED
-                                print(f"{color}Training Status: {tpgmm.training_status}{RESET}")
-                                print(f"Number of Gaussians: {num_of_gauss}")
-                                print(f"Converged Likelihood: {LL}")
-                                print(f"BIC Elapsed \t\t= {tpgmm.bic_time:.4f}s")
-                                print(f"Training: Elapsed \t= {tpgmm.training_time:.4f}s")
-                                total_time += tpgmm.training_time+tpgmm.bic_time
+                        assert isinstance(tpgmm, TPGMM)
+                        num_of_gauss = tpgmm.num_of_gauss
+                        LL = tpgmm.converged_LL
+                        
+                        if len(LL) > 1:
+                            print(f"{tpgmm.model_id} found")
+                            stat_info = os.stat(tpgmm_file_path)
+                            creation_time = stat_info.st_mtime
+                            readable_time = datetime.fromtimestamp(creation_time)
+                            print(f"File created: {readable_time}")
+                            color = GREEN if tpgmm.training_status == "Success" else RED
+                            print(f"{color}Training Status: {tpgmm.training_status}{RESET}")
+                            print(f"Number of Gaussians: {num_of_gauss}")
+                            print(f"Converged Likelihood: {LL}")
+                            print(f"BIC Elapsed \t\t= {tpgmm.bic_time:.4f}s")
+                            print(f"Training: Elapsed \t= {tpgmm.training_time:.4f}s")
+                            total_time += tpgmm.training_time+tpgmm.bic_time
                     else:
                         fail = True
                         retry = 0
@@ -147,7 +142,7 @@ for train_var_num,total_combi in zip([4,5],[7,6]):
                     """
                     Deployment pipeline
                     """
-                    if deploy and not exist:
+                    if deploy:
                         """
                         compile training data
                         """
