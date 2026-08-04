@@ -1,3 +1,4 @@
-# UBO-CORC-ROS2
-CORC stateMachine for Upper Body Orthosis with ROS2 integration
+# CORC Extension Package for Learning from Demonstration applications
+ ROS2 implementation
+ 
 
