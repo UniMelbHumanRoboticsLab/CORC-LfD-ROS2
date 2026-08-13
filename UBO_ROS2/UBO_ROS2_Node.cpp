@@ -49,7 +49,7 @@ UBO_ROS2_Node::publish_wrenches(Eigen::VectorXd wrenches,Eigen::VectorXd olStatu
     // Instantiate joint state message
     // spdlog::debug("publishing");
     int num_rft = wrenches.size()/6;
-    // spdlog::debug("Publishing {} wrenches", num_rft);
+    geometry_msgs::msg::Vector3 msg2;
 
     for (int i=0; i< num_rft; i++)
     {
@@ -69,21 +69,21 @@ UBO_ROS2_Node::publish_wrenches(Eigen::VectorXd wrenches,Eigen::VectorXd olStatu
         if (i == 0)
         {
             wrench1_pub->publish(msg);
+            msg2.x = olStatus[i];
         }
         else if (i == 1)
         {
             wrench2_pub->publish(msg);
+            msg2.y = olStatus[i];
         }
         else if (i == 2)
         {
             wrench3_pub->publish(msg);
+            msg2.z = olStatus[i];
         }
     }
     
-    geometry_msgs::msg::Vector3 msg2;
-    msg2.x = olStatus[0];
-    msg2.y = olStatus[1];
-    msg2.z = olStatus[2];
+
     rft_stats->publish(msg2);
     
     
