@@ -11,7 +11,7 @@
 #define M3STATE_H_DEF
 
 #include "State.h"
-#include "FT_RobotM3.h"
+#include "RobotM3.h"
 #include "LogHelper.h"
 #include "FLNLHelper.h"
 
@@ -75,9 +75,9 @@ typedef struct Deweight_s
  */
 class EMU_ROS2_State : public State {
    protected:
-    FT_RobotM3 * robot;                               //!< Pointer to state machines robot object
+    RobotM3 * robot;                               //!< Pointer to state machines robot object
 
-    EMU_ROS2_State(FT_RobotM3* M3, EMU_ROS2 *sm_, const char *name = NULL): State(name), robot(M3), sm(sm_){spdlog::debug("Created EMU_ROS2_State {}", name);};
+    EMU_ROS2_State(RobotM3* M3, EMU_ROS2 *sm_, const char *name = NULL): State(name), robot(M3), sm(sm_){spdlog::debug("Created EMU_ROS2_State {}", name);};
    private:
     void entry(void) final {
         //Actual state entry
@@ -110,7 +110,7 @@ class EMU_ROS2_State : public State {
 class M3NothingState : public EMU_ROS2_State {
 
    public:
-    M3NothingState(FT_RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Do Nothing"):EMU_ROS2_State(M3, sm, name){};
+    M3NothingState(RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Do Nothing"):EMU_ROS2_State(M3, sm, name){};
 
     void entryCode(void) { robot->initTorqueControl(); robot->setJointTorque(VM3(0,0,0)); }
     void duringCode(void) 
@@ -130,7 +130,7 @@ class M3NothingState : public EMU_ROS2_State {
 class M3CalibState : public EMU_ROS2_State {
 
    public:
-    M3CalibState(FT_RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Calib"):EMU_ROS2_State(M3, sm, name){};
+    M3CalibState(RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Calib"):EMU_ROS2_State(M3, sm, name){};
 
     void entryCode(void);
     void duringCode(void);
@@ -153,7 +153,7 @@ class M3CalibState : public EMU_ROS2_State {
 class M3LockState : public EMU_ROS2_State {
 
    public:
-    M3LockState(FT_RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Lock"):EMU_ROS2_State(M3, sm, name){};
+    M3LockState(RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Lock"):EMU_ROS2_State(M3, sm, name){};
 
     void entryCode(void);
     void duringCode(void);
@@ -173,7 +173,7 @@ class M3LockState : public EMU_ROS2_State {
 class M3StandbyPublishState : public EMU_ROS2_State {
 
    public:
-    M3StandbyPublishState(FT_RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Standby Publish"):EMU_ROS2_State(M3, sm, name){};
+    M3StandbyPublishState(RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Standby Publish"):EMU_ROS2_State(M3, sm, name){};
 
     void entryCode(void);
     void duringCode(void);
@@ -198,7 +198,7 @@ class M3StandbyPublishState : public EMU_ROS2_State {
 class M3PtToPt: public EMU_ROS2_State {
 
    public:
-    M3PtToPt(FT_RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Pt to Pt"):EMU_ROS2_State(M3, sm, name) { };
+    M3PtToPt(RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Pt to Pt"):EMU_ROS2_State(M3, sm, name) { };
 
     virtual void entryCode(void) = 0;
     virtual void duringCode(void) = 0;
@@ -248,7 +248,7 @@ class M3PtToPt: public EMU_ROS2_State {
 class M3ReproduceState : public M3PtToPt {
 
    public:
-    M3ReproduceState(FT_RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Reproduce"):M3PtToPt(M3, sm, name){};
+    M3ReproduceState(RobotM3 * M3, EMU_ROS2 *sm, const char *name = "M3 Reproduce"):M3PtToPt(M3, sm, name){};
 
     void entryCode(void);
     void duringCode(void);

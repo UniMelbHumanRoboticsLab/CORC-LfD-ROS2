@@ -62,6 +62,7 @@ class FT_EMU_ROS2_State : public State {
     virtual void entryCode(){};
     virtual void duringCode(){};
     virtual void exitCode(){};
+    void printFullStates(const std::string& extras = "");
 
    protected:
     FT_EMU_ROS2 *sm;
@@ -78,25 +79,10 @@ class M3InitState : public FT_EMU_ROS2_State {
 
    public:
     M3InitState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Init State"):FT_EMU_ROS2_State(M3, sm, name){};
-
-    void entryCode(void) { spdlog::info("InitState Entry");robot->initTorqueControl(); robot->setJointTorque(VM3(0,0,0));robot->setFT_SensorsFilter(); }
-    void duringCode(void) 
-    { 
-        if(robot->joystick->isButtonTransition(1)>0)
-        {
-            spdlog::warn("Button 1 :D");
-        }
-        if(robot->joystick->isButtonTransition(2)>0)
-        {
-            spdlog::warn("Button 2 :D");
-        }
-        if(robot->joystick->isButtonTransition(3)>0)
-        {
-            spdlog::warn("Button 3 :D");
-        }
-        robot->setJointTorque(VM3(0,0,0)); 
-    }
-    void exitCode(void) { robot->setJointTorque(VM3(0,0,0)); spdlog::info("InitState Exit");}
+    
+    void entryCode(void);
+    void duringCode(void);
+    void exitCode(void);
 };
 
 /**
@@ -139,7 +125,7 @@ class M3FTCalibState : public FT_EMU_ROS2_State {
    private:
    Eigen::ArrayXXd readings;
     bool calibDone=false;
-    int curReading = 0;
+    int readingCount = 0;
 };
 
 /**
@@ -162,7 +148,7 @@ class M3StandbyPublishState : public FT_EMU_ROS2_State {
     double mass = 0;                       //!< Desired mass to apply: might differ from applied_mass during transition (i.e. setMass)
     double change_mass_rate = 2.;          //!< Rate at which mass will increase/decrease during change mass transition (in kg/s)
     
-    Eigen::VectorXd lastRFTReadings;
+    Eigen::VectorXd lastWrenches;
 };
 
 /**

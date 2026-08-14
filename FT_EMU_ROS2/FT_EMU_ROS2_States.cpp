@@ -71,14 +71,60 @@ void FT_EMU_ROS2_State::during(void) {
     if(stateLogger.isInitialised()) {
         stateLogger.recordLogData();
     }
-    sm->get_node()->publish_joint_states();
+    if(robot->keyboard->getKeyUC()=='V' ){
+        sm->robotVerbose = !sm->robotVerbose;
+    }
+}
+void FT_EMU_ROS2_State::printFullStates(const std::string& extras) {
+    if(iterations()%200==1) {
+        robot->printJointStatus();
+        robot->printStatus();    
+        robot->printWrenches();
+        if (!extras.empty()) {
+            std::cout << extras;
+        }
+        std::cout <<  std::endl;
+        std::cout <<  std::noshowpos;
+    }
 }
 
+
+/**
+ * \brief Initialises everthing then waits for a calib command. Set drives in torque control mode.
+ *
+ */
+void M3InitState::entryCode(void) { 
+    sm->stateID = 0;
+    sm->get_node()->publish_state_id(sm->stateID);
+    robot->initTorqueControl(); robot->setJointTorque(VM3(0,0,0));robot->setFT_SensorsFilter(); 
+}
+
+void M3InitState::duringCode(void){ 
+    if(robot->joystick->isButtonTransition(1)>0)
+    {
+        spdlog::warn("Button 1 :D");
+    }
+    if(robot->joystick->isButtonTransition(2)>0)
+    {
+        spdlog::warn("Button 2 :D");
+    }
+    if(robot->joystick->isButtonTransition(3)>0)
+    {
+        spdlog::warn("Button 3 :D");
+    }
+    robot->setJointTorque(VM3(0,0,0)); 
+}
+void M3InitState::exitCode(void) { 
+    robot->setJointTorque(VM3(0,0,0));
+}
+    
 /**
  * \brief Position calibration of M3. Go to the bottom left stops of robot at constant torque for absolute position calibration. Set drives in torque control mode.
  *
  */
 void M3CalibState::entryCode(void) {
+    sm->stateID = 1;
+    sm->get_node()->publish_state_id(sm->stateID);
     calibDone=false;
     for(unsigned int i=0; i<3; i++) {
         stop_reached_time[i] = .0;
@@ -139,41 +185,41 @@ void M3CalibState::exitCode(void) {
  * 
  */
 void M3FTCalibState::entryCode(void) {
+    sm->stateID = 1;
+    sm->get_node()->publish_state_id(sm->stateID);
     calibDone = false;
-    
-
-    Eigen::VectorXd force = robot->getFT_readings();
-    readings = Eigen::ArrayXXd::Zero(NUM_CALIBRATE_READINGS, force.size());
+    std::cout << "Calibrating RFT (keep clear)..." << std::flush;
+    Eigen::VectorXd wrenches = robot->getWrenches();
+    readings = Eigen::ArrayXXd::Zero(NUM_CALIBRATE_READINGS, wrenches.size());
 
     // Take average of the matrices
     Eigen::VectorXd offsets = Eigen::VectorXd::Zero(readings.cols());
-    robot->setFTOffsets(offsets);
 
     if(spdlog::get_level()<=spdlog::level::debug) {
-        stateLogger.initLogger("FTCalib", "logs/FTCalibLog.csv", LogFormat::CSV, true);
+        stateLogger.initLogger("FT_EMU_Calib_Log", "logs/corc_recordings/FT_EMU/FT_EMU_Calib.csv", LogFormat::CSV, true);
         stateLogger.add(running(), "%Time(s)");
-        stateLogger.add(robot->getFT_readings(), "F");
+        stateLogger.add(robot->getWrenches(), "W");
         stateLogger.startLogger();
     }
     robot->startFT_Sensors();
-    curReading =0;
+    readingCount = 0;
     std::cout << "Calibrating RFT (keep clear)..." << std::flush;
 }
 //collect offsets to the RFT sensors
 void M3FTCalibState::duringCode(void) {
     // Collect data and save
-    if (curReading< NUM_CALIBRATE_READINGS){
+    if (readingCount< NUM_CALIBRATE_READINGS){
         if(iterations()%100==1) {
             std::cout << "." << std::flush;
         }
-        readings.row(curReading) = robot->getFT_readings();
+        readings.row(readingCount) = robot->getWrenches();
     }
     else
     {
         std::cout << "OK." << std::endl;
         calibDone = true;
     }
-    curReading = curReading+1;
+    readingCount = readingCount+1;
 }
 void M3FTCalibState::exitCode(void) {
     // Take average of the matrices
@@ -182,17 +228,19 @@ void M3FTCalibState::exitCode(void) {
     // Set offsets for crutches
     for (int i = 0; i < readings.cols(); i++) {
         offsets[i] = readings.col(i).sum()/NUM_CALIBRATE_READINGS;
-        spdlog::debug("RFT Offset {}", offsets[i]);
     }
+    
     spdlog::info("FT Calibration Complete, setting offsets");
 
     for (int i = 0; i < readings.cols()/6; i++){
+        Eigen::VectorXd cur_offsets = offsets.segment(i*6, 6).transpose();
+        spdlog::debug("RFT {} Offset [{}, {}, {}, {}, {}, {}]", i,cur_offsets[0],cur_offsets[1],cur_offsets[2],cur_offsets[3],cur_offsets[4],cur_offsets[5]);
         if (offsets.segment(i*6, 6).isApprox(Eigen::VectorXd::Zero(6))){
             spdlog::warn("RFTs may not be connected");
         }
     }
 
-    robot->setFTOffsets(offsets);
+    robot->setWrenchesOffset(offsets);
     spdlog::info("CalibrateState Exit");
     robot->stopFT_Sensors();
 }
@@ -201,18 +249,32 @@ void M3FTCalibState::exitCode(void) {
  * \brief Start publishing robot state. Provide end-effector mass compensation on M3. 
  * \details Mass is controllable through keyboard inputs. Assumes drives in torque control already.
  */
+ 
 void M3StandbyPublishState::entryCode(void) {
+    sm->stateID = 2;
+    sm->get_node()->publish_state_id(sm->stateID);
     robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
     std::cout << "Press S to decrease mass (-100g), W to increase (+100g)." << std::endl;
     
-    lastRFTReadings = robot->getFT_readings();
+    lastWrenches = robot->getWrenches();
     if(robot->startFT_Sensors())
     {
         spdlog::info("Starting RFT");
     }
 }
 void M3StandbyPublishState::duringCode(void) {
-    
+
+    /**
+     * \ad hoc mass compensation
+     */
+     
+    //Mass controllable through keyboard inputs
+    if(robot->keyboard->getS()) {
+        mass -=0.2;
+    }
+    if(robot->keyboard->getW()) {
+        mass +=0.2;
+    }
     //Bound mass to +-10kg
     if(mass>mass_limit) {
         mass = mass_limit;
@@ -233,39 +295,28 @@ void M3StandbyPublishState::duringCode(void) {
         //Apply corresponding deweighting force w/o friction comp
         robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
     }
-
-    //Mass controllable through keyboard inputs
-    if(robot->keyboard->getS()) {
-        mass -=0.2;
-    }
-    if(robot->keyboard->getW()) {
-        mass +=0.2;
-    }
-    
-    Eigen::VectorXd curReadings = robot->getCorrectedFT_readings();
+   
     // Check if some sensors are not responding properly every one second
+    Eigen::VectorXd curWrenches = robot->getWrenches();
     if(iterations() % 100 == 99){
         bool ok = true;
-        if (lastRFTReadings.isApprox(curReadings)){
-            spdlog::error("Crutches Not Updating");
+        if (lastWrenches.isApprox(curWrenches)){
             ok = false;
         }
-        lastRFTReadings = curReadings;
+        lastWrenches = curWrenches;
     }
     
-    if(iterations()%200==1) {
-        robot->printJointStatus();
-        robot->printStatus();
-        robot->printFT_readings(curReadings);
-        std::cout << std::setprecision(3) << std::fixed << std::showpos;
-        std::cout << "MassComp"  << "=[ " << sm->MassComp << " ]\t";
-        std::cout << "MassReq"  << "=[ " << mass << " ]\t";
-        std::cout << "ForceReq"  << "=[ " << mass*9.8 << " ]\t";
-        std::cout <<  std::endl;
-        std::cout <<  std::endl;
-        std::cout <<  std::noshowpos;
+    if (sm->robotVerbose){
+        std::ostringstream oss;
+        oss << std::setprecision(3) << std::fixed << std::showpos;
+        oss << "MassComp:"<< sm->MassComp << "\t\t";
+        oss <<  "MassReq:"<<  mass         << "\t\t";
+        oss <<  "ForceReq:"<< mass * 9.8   << "\n";
+        printFullStates(oss.str());
     }
-    
+
+    // publish to ROS2 network
+    sm->get_node()->publish_task_dynamics();
 }
 void M3StandbyPublishState::exitCode(void) {
     robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
@@ -280,6 +331,8 @@ void M3StandbyPublishState::exitCode(void) {
  *
  */
 void M3LockState::entryCode(void) {
+    sm->stateID = 3;
+    sm->get_node()->publish_state_id(sm->stateID);
     robot->setEndEffForceWithCompensation(VM3::Zero(), false);
     X0 = robot->getEndEffPosition();
     if(robot->startFT_Sensors())
@@ -293,14 +346,9 @@ void M3LockState::duringCode(void) {
     Eigen::Matrix3d D = d*Eigen::Matrix3d::Identity();
     VM3 Fd = impedance(K, D, X0, robot->getEndEffPosition(), robot->getEndEffVelocity());
     robot->setEndEffForceWithCompensation(Fd, false);
-    Eigen::VectorXd curReadings = robot->getCorrectedFT_readings();
     
-    if(iterations()%200==1) {
-        robot->printJointStatus();
-        robot->printStatus();    
-        robot->printFT_readings(curReadings);
-        std::cout <<  std::endl;
-        std::cout <<  std::noshowpos;
+    if (sm->robotVerbose){
+        printFullStates();
     }
 }
 void M3LockState::exitCode(void) {

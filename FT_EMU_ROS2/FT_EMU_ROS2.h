@@ -10,7 +10,7 @@
 #ifndef FT_M3_SM_H
 #define FT_M3_SM_H
 
-
+#include <cstdint>
 #include "StateMachine.h"
 #include "FT_RobotM3.h"
 #include "FLNLHelper.h"
@@ -34,10 +34,13 @@ class FT_EMU_ROS2 : public StateMachine {
         void hwStateUpdate();
         
         FT_RobotM3 *robot() { return static_cast<FT_RobotM3*>(_robot.get()); } //!< Robot getter with specialised type (lifetime is managed by Base StateMachine)
-        const std::shared_ptr<FT_EMU_ROS2_Node> &get_node(){ return m_Node;}
+        const std::shared_ptr<FT_EMU_ROS2_Node> &get_node(){ return m_Node;} // get the ros 2 node to access ROS2 functions and attributes
         std::shared_ptr<FLNLHelper> UIserver = nullptr;     //!< Pointer to communication server
         
-        double MassComp =0;         //!< Mass comp value used for standard operations
+        double MassComp = 0;         //!< Mass comp value used for standard operations
+        bool robotVerbose = false;
+        uint16_t stateID = 0;
+        unint16_t sbmvmtNum = 0;
 
     private:
         std::shared_ptr<FT_EMU_ROS2_Node> m_Node;

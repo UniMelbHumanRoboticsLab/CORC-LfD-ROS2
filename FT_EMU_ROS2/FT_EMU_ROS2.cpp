@@ -107,7 +107,7 @@ FT_EMU_ROS2::FT_EMU_ROS2(int argc, char **argv)  {
     rclcpp::init(argc, argv, ros_init);
 
     // Create the ROS2 node and pass a reference to the X2 Robot object
-    m_Node = std::make_shared<FT_EMU_ROS2_Node>("EMU", robot());
+    m_Node = std::make_shared<FT_EMU_ROS2_Node>("FT_EMU", robot());
 
     //Create state instances and add to the State Machine
     addState("InitState", std::make_shared<M3InitState>(robot(), this));
@@ -148,7 +148,7 @@ FT_EMU_ROS2::~FT_EMU_ROS2() {
 void FT_EMU_ROS2::init() {
     spdlog::debug("FT_EMU_ROS2::init()");
     if(robot()->initialise()) {
-        logHelper.initLogger("FT_EMU_ROS2Log", "logs/FT_EMU_ROS2.csv", LogFormat::CSV, true);
+        logHelper.initLogger("FT_EMU_ROS2_Log", "logs/corc_recordings/FT_EMU/FT_EMU_ROS2.csv", LogFormat::CSV, true);
         logHelper.add(runningTime(), "Time (s)");
         logHelper.add(robot()->getEndEffPosition(), "X");
         logHelper.add(robot()->getEndEffVelocity(), "dX");

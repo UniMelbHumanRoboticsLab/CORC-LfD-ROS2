@@ -11,8 +11,10 @@
 
 #include "FT_RobotM3.h"
 #include <string>
+#include <cstdint>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_msgs/msg/u_int16.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 
 using std::placeholders::_1;
@@ -22,20 +24,18 @@ class FT_EMU_ROS2_Node : public rclcpp::Node
 public:
     FT_EMU_ROS2_Node(const std::string &name, FT_RobotM3 *robot);
 
-    void humanJA_callback(const sensor_msgs::msg::JointState::SharedPtr  msg);
-    void publish_joint_states();
+    void wrench_callback(const sensor_msgs::msg::JointState::SharedPtr  msg);
+    void publish_task_dynamics();
+    void publish_state_id(uint16_t id);
 
     rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_interface();
-    bool return_lfd_ready() { return lfd_ready;}
-    bool lfd_ready;
-    std::vector<Eigen::VectorXd> lfd_trajectory;
 
 private:
     FT_RobotM3 *m_Robot;
-
-    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr m_Sub;
-    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr m_Pub;
     
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr wrench_sub;
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr task_pub;
+    rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr state_pub;
 };
 
 #endif//FT_EMU_ROS2_Node_H
