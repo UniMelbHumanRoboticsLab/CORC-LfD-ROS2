@@ -25,7 +25,7 @@ public:
     FT_EMU_ROS2_Node(const std::string &name, FT_RobotM3 *robot);
 
     void wrench_callback(const sensor_msgs::msg::JointState::SharedPtr  msg);
-    void publish_task_dynamics();
+    void publish_task_dynamics(uint16_t sbmvmtNum);
     void publish_state_id(uint16_t id);
 
     rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_interface();

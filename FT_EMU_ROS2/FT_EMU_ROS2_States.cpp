@@ -316,7 +316,7 @@ void M3StandbyPublishState::duringCode(void) {
     }
 
     // publish to ROS2 network
-    sm->get_node()->publish_task_dynamics();
+    sm->get_node()->publish_task_dynamics(1);
 }
 void M3StandbyPublishState::exitCode(void) {
     robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
