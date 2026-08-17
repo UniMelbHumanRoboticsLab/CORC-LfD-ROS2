@@ -11,7 +11,7 @@ import pickle
 sys.path.append(os.path.join(os.path.dirname(__file__)))
 from stats_pkg import compute_central_tendency
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from pyCORC.pycorc_io.package_utils.unpack_json import get_subject_file
+from corc_py.pycorc_io.package_utils.unpack_json import get_subject_file
 from data_process.file_util_pkg import get_raw_data
 from lfd.tpgmm_pkg.TPGMM import TPGMM
 sys.modules['tpgmm_pkg'] = sys.modules['lfd.tpgmm_pkg'] # because it was saved in another file directory - pickle is dumb

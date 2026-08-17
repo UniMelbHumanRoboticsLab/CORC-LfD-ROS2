@@ -14,8 +14,8 @@ from file_util_pkg import get_raw_data,separate_train_test_val,create_dir
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from data_visual.plot_pkg import plot_multi_dim,plot_3d_trajectory,split_plot_all,interactive_plot
-from pyCORC.pycorc_io.xsens.ub_pckg.ub import ub
-from pyCORC.pycorc_io.package_utils.unpack_json import get_subject_params
+from corc_py.pycorc_io.xsens.ub_pckg.ub import ub
+from corc_py.pycorc_io.package_utils.unpack_json import get_subject_params
 import FreeSimpleGUI as sg
 #importing Pathlib
 from pathlib import Path
