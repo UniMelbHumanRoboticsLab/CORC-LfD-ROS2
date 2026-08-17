@@ -8,7 +8,7 @@ FT_EMU_ROS2_Node::FT_EMU_ROS2_Node(const std::string &name, FT_RobotM3 *robot)
         "desired_wrench", 10, std::bind(&FT_EMU_ROS2_Node::wrench_callback, this, _1)
     );
     // Create a task dynamics publisher
-    task_pub = create_publisher<sensor_msgs::msg::JointState>(
+    task_pub = create_publisher<corc_lfd_interfaces::msg::TaskDemo>(
         "emu_task_dynamics", 10
     );
     state_pub = create_publisher<std_msgs::msg::UInt16>(
@@ -73,12 +73,13 @@ FT_EMU_ROS2_Node::wrench_callback(const sensor_msgs::msg::JointState::SharedPtr 
 void FT_EMU_ROS2_Node::publish_task_dynamics(uint16_t sbmvmtNum)
 {
     // Instantiate joint state message
-    sensor_msgs::msg::JointState msg;
+    corc_lfd_interfaces::msg::TaskDemo msg;
 
     // Assign current header time stamp
     msg.header.stamp = this->now();
+    
+    msg.sbmvmt = sbmvmtNum;
 
-    // Use this naming scheme for robot state publisher to recognise
     msg.name = {
         "x", "y", "z",           // Position (Cartesian)
         "xd", "yd", "zd",        // Velocity (Cartesian)

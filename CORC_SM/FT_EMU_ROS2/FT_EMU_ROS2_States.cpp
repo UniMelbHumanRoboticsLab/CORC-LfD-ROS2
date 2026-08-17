@@ -100,18 +100,6 @@ void M3InitState::entryCode(void) {
 }
 
 void M3InitState::duringCode(void){ 
-    if(robot->joystick->isButtonTransition(1)>0)
-    {
-        spdlog::warn("Button 1 :D");
-    }
-    if(robot->joystick->isButtonTransition(2)>0)
-    {
-        spdlog::warn("Button 2 :D");
-    }
-    if(robot->joystick->isButtonTransition(3)>0)
-    {
-        spdlog::warn("Button 3 :D");
-    }
     robot->setJointTorque(VM3(0,0,0)); 
 }
 void M3InitState::exitCode(void) { 
@@ -306,6 +294,15 @@ void M3StandbyPublishState::duringCode(void) {
         lastWrenches = curWrenches;
     }
     
+    if(robot->joystick->isButtonTransition(1)>0)
+    {
+        sm->sbmvmtNum = sm->sbmvmtNum+1;
+    }
+    if(robot->joystick->isButtonTransition(2)>0 and sm->sbmvmtNum>0)
+    {
+        sm->sbmvmtNum = sm->sbmvmtNum-1;
+    }
+    
     if (sm->robotVerbose){
         std::ostringstream oss;
         oss << std::setprecision(3) << std::fixed << std::showpos;
@@ -316,10 +313,12 @@ void M3StandbyPublishState::duringCode(void) {
     }
 
     // publish to ROS2 network
-    sm->get_node()->publish_task_dynamics(1);
+    sm->get_node()->publish_task_dynamics(sm->sbmvmtNum);
 }
 void M3StandbyPublishState::exitCode(void) {
     robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
+    sm->sbmvmtNum = 0;
+    sm->robotVerbose = false;
     if(robot->stopFT_Sensors())
     {
         spdlog::info("Stopping RFT");
@@ -353,6 +352,8 @@ void M3LockState::duringCode(void) {
 }
 void M3LockState::exitCode(void) {
     robot->setEndEffForceWithCompensation(VM3::Zero(), false);
+    sm->sbmvmtNum = 0;
+    sm->robotVerbose = false;
     if(robot->stopFT_Sensors())
     {
         spdlog::info("Stopping RFT");

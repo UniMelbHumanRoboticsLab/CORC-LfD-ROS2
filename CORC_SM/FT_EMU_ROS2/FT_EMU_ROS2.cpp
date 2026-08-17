@@ -132,7 +132,7 @@ FT_EMU_ROS2::FT_EMU_ROS2(int argc, char **argv)  {
 
     addTransition("ResetState", &goToStandby, "StandbyState");
     
-    //Initialize the state machine with first state of the designed state machine, using baseclass function.
+    //Initialize the state machine with first state of the designed state machine
     setInitState("InitState");
     addTransitionFromAny(&quit, "InitState");
     addTransition("InitState", &quit, "InitState"); //From any does not apply to self (destination state)

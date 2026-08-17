@@ -16,6 +16,7 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/u_int16.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include "corc_lfd_interfaces/msg/task_demo.hpp"
 
 using std::placeholders::_1;
 
@@ -34,7 +35,7 @@ private:
     FT_RobotM3 *m_Robot;
     
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr wrench_sub;
-    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr task_pub;
+    rclcpp::Publisher<corc_lfd_interfaces::msg::TaskDemo>::SharedPtr task_pub;
     rclcpp::Publisher<std_msgs::msg::UInt16>::SharedPtr state_pub;
 };
 
