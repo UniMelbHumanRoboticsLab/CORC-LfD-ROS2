@@ -1,0 +1,2 @@
+string state_id
+uint16 var_num

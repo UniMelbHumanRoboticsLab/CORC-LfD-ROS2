@@ -10,11 +10,16 @@ find_package(ament_cmake REQUIRED)
 
 ############### add dependencies here
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TaskDemo.msg"
-  DEPENDENCIES std_msgs # Add packages that above messages depend on
+  "msg/SessionParam.msg"
+  "msg/SyncData.msg"
+  "msg/StateVar.msg"
+  "msg/DesiredWrench.msg"
+  DEPENDENCIES std_msgs sensor_msgs # Add packages that above messages depend on
 )
 ############### 
 

@@ -1,0 +1,8 @@
+# config.yaml
+exp_id: "exp2"
+patient_id: "p2"
+max_sbmvmt: 2
+num_rep: 3
+sub_id: "sub1"
+learn_input: "joint"
+learn_output: "task"
