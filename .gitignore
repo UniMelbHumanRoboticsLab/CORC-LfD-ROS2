@@ -11,6 +11,6 @@ robotics-toolbox-python/
 *.nbc
 *.nbi
 lfd/tpgmm/tutorial_data/
-test_venv/
+corc_venv/
 data_analyse/figures
 
