@@ -2,54 +2,54 @@
 
 using namespace std;
 
+/**
+ * \Calibration transitions
+ *
+ */
 bool goToCalib(StateMachine & SM) {
     FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
 
-    //keyboard or joystick press
+    //only transition when session parameters is confirmed
     if ( sm.robot()->keyboard->getKeyUC()=='C' )
-        return true;
-
-    //Check incoming command requesting state change
-    if ( sm.UIserver->isCmd("GOCA") ) {
-        sm.UIserver->sendCmd(string("OKCA"));
-        spdlog::debug("goToCalib");
-        return true;
-    }
+        if (sm.expID != "unknown" and sm.patientID != "unknown" and sm.subID != "unknown" and sm.maxSbmvmt != 0) 
+            return true;
+        else{
+            spdlog::warn("Restart Session ID node");
+        }
 
     //Otherwise false
     return false;
 }
+bool initGoToCalib(StateMachine & SM) {
+    FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
 
+    if (sm.expID != "unknown" and sm.patientID != "unknown" and sm.subID != "unknown" and sm.maxSbmvmt != 0) 
+        return true;
+
+    //Otherwise false
+    return false;
+}
 bool endM3Calib(StateMachine & sm) {
     return (sm.state<M3CalibState>("CalibState"))->isCalibDone();
 }
-
 bool endFTCalib(StateMachine & sm) {
     return (sm.state<M3FTCalibState>("FTCalibState"))->isCalibDone();
 }
 
+/**
+ * \transitions between standby
+ *
+ */
 bool goToLock(StateMachine & SM) {
     FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
 
     //keyboard press
-    if ( sm.robot()->joystick->isButtonTransition(3)>0 || sm.robot()->keyboard->getKeyUC()=='L' )
+    if (sm.robot()->keyboard->getKeyUC()=='P' )
         return true;
 
     //Otherwise false
     return false;
 }
-
-bool goToUnlock(StateMachine & SM) {
-    FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
-
-    //keyboard press
-    if ( sm.robot()->keyboard->getKeyUC()=='U' )
-        return true;
-
-    //Otherwise false
-    return false;
-}
-
 bool goToReset(StateMachine & SM) {
     FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
 
@@ -60,22 +60,81 @@ bool goToReset(StateMachine & SM) {
     //Otherwise false
     return false;
 }
-
 bool goToStandby(StateMachine & SM) {
     FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
 
-    //TODO: differentiate (for logging) from standby state
     if ( sm.robot()->keyboard->getKeyUC()=='S' )
         return true;
 
     return false;
 }
+bool goToDemo(StateMachine & SM) {
+    FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
 
-//Exit CORC app properly
-bool quit(StateMachine & SM) {
+    if ( sm.robot()->keyboard->getKeyUC()=='D' or sm.robot()->joystick->isButtonTransition(1)>0)
+        return true;
+
+    return false;
+}
+bool goToLearn(StateMachine & SM) {
     FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
 
     //keyboard press
+    if (sm.robot()->keyboard->getKeyUC()=='L' )
+        return true;
+
+    //Otherwise false
+    return false;
+}
+bool finishLearn(StateMachine & SM) {
+    FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
+
+    if (sm.learn_finish) 
+        return true;
+
+    //Otherwise false
+    return false;
+}
+bool goToNewTP(StateMachine & SM) {
+    FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
+
+    if (sm.robot()->keyboard->getKeyUC()=='N' or sm.robot()->joystick->isButtonTransition(3)>0) 
+    {
+        if (sm.learn_success[sm.varNum-1])
+        {
+            return true;
+        }
+        else
+        {
+            spdlog::warn("Have not learned for Var {}",sm.varNum);
+        }
+    }
+
+
+    //Otherwise false
+    return false;
+}
+bool goToRepro(StateMachine & SM) {
+    FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
+
+    if (sm.robot()->joystick->isButtonTransition(1)>0){
+        if (sm.lfd_repro_ready){
+            return true;
+        }
+        else{
+            spdlog::warn("TPs not enough");
+        }
+    }
+
+    return false;
+}
+/**
+ * \quitting transitions
+ *
+ */
+bool quit(StateMachine & SM) {
+    FT_EMU_ROS2 & sm = static_cast<FT_EMU_ROS2 &>(SM); //Cast to specific StateMachine type
+
     if ( sm.robot()->keyboard->getKeyUC()=='Q' ) {
         std::raise(SIGTERM); //Clean exit
         return true;
@@ -83,7 +142,6 @@ bool quit(StateMachine & SM) {
 
     return false;
 }
-
 
 //Fake transition (return false all the time) used to update the mass parameter
 bool updateMass(StateMachine & SM) {
@@ -93,8 +151,6 @@ bool updateMass(StateMachine & SM) {
 
     return false;
 }
-
-
 
 FT_EMU_ROS2::FT_EMU_ROS2(int argc, char **argv)  {
     //Create a Robot and set it to generic state machine
@@ -114,29 +170,44 @@ FT_EMU_ROS2::FT_EMU_ROS2(int argc, char **argv)  {
     addState("ResetState", std::make_shared<M3InitState>(robot(), this));
     addState("CalibState", std::make_shared<M3CalibState>(robot(), this));
     addState("FTCalibState", std::make_shared<M3FTCalibState>(robot(), this));
-    addState("StandbyState", std::make_shared<M3StandbyPublishState>(robot(), this));
+    addState("StandbyState", std::make_shared<M3StandbyState>(robot(), this));
     addState("LockState", std::make_shared<M3LockState>(robot(), this));
-
-    //Define transitions between states
-    // transition to states
-    addTransition("InitState", &goToCalib, "CalibState");
-    addTransition("CalibState", &endM3Calib, "FTCalibState");
-    addTransition("FTCalibState", &endFTCalib, "StandbyState");
-    addTransition("StandbyState", &updateMass, "StandbyState"); //Fake transition never returning true
-
-    // transition to the reset state or recalibrate FT state
-    addTransition("StandbyState", &goToCalib, "FTCalibState");
-    addTransition("StandbyState", &goToReset, "ResetState");
-    addTransition("StandbyState", &goToLock, "LockState");
-    addTransition("LockState", &goToLock, "StandbyState");
-
-    addTransition("ResetState", &goToStandby, "StandbyState");
+    addState("DemoState", std::make_shared<M3DemoState>(robot(), this));
+    addState("LearnState", std::make_shared<M3LearnState>(robot(), this));
+    addState("NewTPState", std::make_shared<M3NewTPState>(robot(), this));
+    addState("ReproLfDState", std::make_shared<M3ReproLfDState>(robot(), this));
     
-    //Initialize the state machine with first state of the designed state machine
+    //state machine initialisation and quitting 
     setInitState("InitState");
     addTransitionFromAny(&quit, "InitState");
     addTransition("InitState", &quit, "InitState"); //From any does not apply to self (destination state)
+
+    //Define transitions between functional states
+    // initial transitions to always go through
+    addTransition("InitState", &initGoToCalib, "CalibState");
+    addTransition("CalibState", &endM3Calib, "FTCalibState");
+    addTransition("FTCalibState", &endFTCalib, "StandbyState");
+    addTransition("StandbyState", &updateMass, "StandbyState"); //Fake transition never returning true
+    
+    // transtions between standby
+    addTransition("StandbyState", &goToCalib, "FTCalibState");
+    addTransition("StandbyState", &goToReset, "ResetState");
+    addTransition("ResetState", &goToStandby, "StandbyState");
+    
+    addTransition("StandbyState", &goToLock, "LockState");
+    addTransition("LockState", &goToLock, "StandbyState");
+    
+    addTransition("StandbyState", &goToDemo, "DemoState");
+    addTransition("DemoState", &goToStandby, "StandbyState");
+    
+    addTransition("StandbyState", &goToLearn, "LearnState");
+    addTransition("LearnState", &finishLearn, "StandbyState");
+    
+    addTransition("StandbyState", &goToNewTP, "NewTPState");
+    addTransition("NewTPState", &goToRepro, "ReproLfDState");
+    addTransition("ReproLfDState", &goToStandby, "StandbyState");
 }
+
 FT_EMU_ROS2::~FT_EMU_ROS2() {
 }
 
@@ -148,7 +219,7 @@ FT_EMU_ROS2::~FT_EMU_ROS2() {
 void FT_EMU_ROS2::init() {
     spdlog::debug("FT_EMU_ROS2::init()");
     if(robot()->initialise()) {
-        logHelper.initLogger("FT_EMU_ROS2_Log", "logs/corc_recordings/FT_EMU/FT_EMU_ROS2.csv", LogFormat::CSV, true);
+        logHelper.initLogger("FT_EMU_ROS2_Log", "logs/corc_recordings/FT_EMU/exp2/FT_EMU_ROS2.csv", LogFormat::CSV, true);
         logHelper.add(runningTime(), "Time (s)");
         logHelper.add(robot()->getEndEffPosition(), "X");
         logHelper.add(robot()->getEndEffVelocity(), "dX");
@@ -172,6 +243,8 @@ void FT_EMU_ROS2::init() {
 void FT_EMU_ROS2::end() {
     if(running())
         UIserver->closeConnection();
+    FT_EMU_ROS2::stateID = "quit";
+    FT_EMU_ROS2::get_node()->publish_state_var(FT_EMU_ROS2::stateID,0);
     StateMachine::end();
 }
 

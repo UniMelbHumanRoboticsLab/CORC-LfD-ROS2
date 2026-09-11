@@ -1,5 +1,6 @@
 #include "FT_EMU_ROS2_States.h"
 #include "FT_EMU_ROS2.h"
+#include <fmt/format.h>
 
 using namespace std;
 
@@ -88,22 +89,32 @@ void FT_EMU_ROS2_State::printFullStates(const std::string& extras) {
     }
 }
 
-
 /**
  * \brief Initialises everthing then waits for a calib command. Set drives in torque control mode.
  *
  */
 void M3InitState::entryCode(void) { 
-    sm->stateID = 0;
-    sm->get_node()->publish_state_id(sm->stateID);
-    robot->initTorqueControl(); robot->setJointTorque(VM3(0,0,0));robot->setFT_SensorsFilter(); 
+    if (sm->stateID != "quit"){
+        sm->stateID = "init";
+        sm->get_node()->publish_state_var(sm->stateID,0);
+        
+        robot->initTorqueControl(); robot->setJointTorque(VM3(0,0,0));robot->setFT_SensorsFilter(); 
+    }
 }
-
 void M3InitState::duringCode(void){ 
     robot->setJointTorque(VM3(0,0,0)); 
+    sessionParam = sm->get_node()->get_session_param();
+    sessionParamInts = sm->get_node()->get_session_param_ints();
+
+    sm->expID = sessionParam[0];
+    sm->patientID = sessionParam[1];
+    sm->subID = sessionParam[2];
+    sm->maxSbmvmt = sessionParamInts[0];
+    sm->learnOutput = sessionParam[3];
 }
 void M3InitState::exitCode(void) { 
     robot->setJointTorque(VM3(0,0,0));
+    spdlog::info("Session Params: [ expID: {}, patientID: {}, subID: {}, maxSbmvmt: {}, Learned Output: {} ]",sm->expID,sm->patientID,sm->subID,sm->maxSbmvmt,sm->learnOutput);
 }
     
 /**
@@ -111,8 +122,8 @@ void M3InitState::exitCode(void) {
  *
  */
 void M3CalibState::entryCode(void) {
-    sm->stateID = 1;
-    sm->get_node()->publish_state_id(sm->stateID);
+    sm->stateID = "calib";
+    sm->get_node()->publish_state_var(sm->stateID,0);
     calibDone=false;
     for(unsigned int i=0; i<3; i++) {
         stop_reached_time[i] = .0;
@@ -123,6 +134,7 @@ void M3CalibState::entryCode(void) {
     robot->printJointStatus();
     qi=robot->getPosition();
     std::cout << "Calibrating EMU (keep clear)..." << std::flush;
+    std::cout <<  std::endl;
 }
 //Move slowly on each joint until max force detected
 void M3CalibState::duringCode(void) {
@@ -173,8 +185,9 @@ void M3CalibState::exitCode(void) {
  * 
  */
 void M3FTCalibState::entryCode(void) {
-    sm->stateID = 1;
-    sm->get_node()->publish_state_id(sm->stateID);
+    sm->stateID = "calib";
+    sm->get_node()->publish_state_var(sm->stateID,0);
+    
     calibDone = false;
     std::cout << "Calibrating RFT (keep clear)..." << std::flush;
     Eigen::VectorXd wrenches = robot->getWrenches();
@@ -184,7 +197,12 @@ void M3FTCalibState::entryCode(void) {
     Eigen::VectorXd offsets = Eigen::VectorXd::Zero(readings.cols());
 
     if(spdlog::get_level()<=spdlog::level::debug) {
-        stateLogger.initLogger("FT_EMU_Calib_Log", "logs/corc_recordings/FT_EMU/FT_EMU_Calib.csv", LogFormat::CSV, true);
+        rcpputils::fs::path logDir = rcpputils::fs::path("logs/corc_recordings/FT_EMU") / sm->expID / sm->patientID / sm->subID;
+        rcpputils::fs::create_directories(logDir);
+        std::string logPath = (logDir / ("FT_EMU_Calib.csv")).string();
+                
+        // Initialize logger
+        stateLogger.initLogger("FT_EMU_Calib_Log", logPath, LogFormat::CSV, true);
         stateLogger.add(running(), "%Time(s)");
         stateLogger.add(robot->getWrenches(), "W");
         stateLogger.startLogger();
@@ -192,6 +210,7 @@ void M3FTCalibState::entryCode(void) {
     robot->startFT_Sensors();
     readingCount = 0;
     std::cout << "Calibrating RFT (keep clear)..." << std::flush;
+    std::cout <<  std::endl;
 }
 //collect offsets to the RFT sensors
 void M3FTCalibState::duringCode(void) {
@@ -217,9 +236,7 @@ void M3FTCalibState::exitCode(void) {
     for (int i = 0; i < readings.cols(); i++) {
         offsets[i] = readings.col(i).sum()/NUM_CALIBRATE_READINGS;
     }
-    
     spdlog::info("FT Calibration Complete, setting offsets");
-
     for (int i = 0; i < readings.cols()/6; i++){
         Eigen::VectorXd cur_offsets = offsets.segment(i*6, 6).transpose();
         spdlog::debug("RFT {} Offset [{}, {}, {}, {}, {}, {}]", i,cur_offsets[0],cur_offsets[1],cur_offsets[2],cur_offsets[3],cur_offsets[4],cur_offsets[5]);
@@ -227,30 +244,31 @@ void M3FTCalibState::exitCode(void) {
             spdlog::warn("RFTs may not be connected");
         }
     }
-
     robot->setWrenchesOffset(offsets);
     spdlog::info("CalibrateState Exit");
     robot->stopFT_Sensors();
 }
 
 /**
- * \brief Start publishing robot state. Provide end-effector mass compensation on M3. 
+ * \brief Standby State for therapist to set variation number
  * \details Mass is controllable through keyboard inputs. Assumes drives in torque control already.
  */
  
-void M3StandbyPublishState::entryCode(void) {
-    sm->stateID = 2;
-    sm->get_node()->publish_state_id(sm->stateID);
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
-    std::cout << "Press S to decrease mass (-100g), W to increase (+100g)." << std::endl;
+void M3StandbyState::entryCode(void) {  
+    sm->stateID = "standby";
+    sm->get_node()->publish_state_var(sm->stateID,0);
     
-    lastWrenches = robot->getWrenches();
-    if(robot->startFT_Sensors())
-    {
-        spdlog::info("Starting RFT");
-    }
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
+//     std::cout << "Press S to decrease mass (-100g), W to increase (+100g)." << std::endl;
+    
+//     lastWrenches = robot->getWrenches();
+//     if(robot->startFT_Sensors())
+//     {
+//         spdlog::info("Starting RFT");
+//     }
+    spdlog::info("Current Var: {}. Add Var ('2'). Start Demo ('1'). Start Repro ('3').",sm->varNum);
 }
-void M3StandbyPublishState::duringCode(void) {
+void M3StandbyState::duringCode(void) {
 
     /**
      * \ad hoc mass compensation
@@ -284,23 +302,25 @@ void M3StandbyPublishState::duringCode(void) {
         robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
     }
    
-    // Check if some sensors are not responding properly every one second
-    Eigen::VectorXd curWrenches = robot->getWrenches();
-    if(iterations() % 100 == 99){
-        bool ok = true;
-        if (lastWrenches.isApprox(curWrenches)){
-            ok = false;
-        }
-        lastWrenches = curWrenches;
-    }
+//     // Check if some sensors are not responding properly every one second
+//     Eigen::VectorXd curWrenches = robot->getWrenches();
+//     if(iterations() % 100 == 99){
+//         bool ok = true;
+//         if (lastWrenches.isApprox(curWrenches)){
+//             ok = false;
+//         }
+//         lastWrenches = curWrenches;
+//     }
     
-    if(robot->joystick->isButtonTransition(1)>0)
+    if(robot->joystick->isButtonTransition(2)>0 and sm->varNum < 6)
     {
-        sm->sbmvmtNum = sm->sbmvmtNum+1;
+        sm->varNum = sm->varNum+1;
+        spdlog::info("Current Var: {}. Add Var ('2'). Start Demo ('1'). Start Repro ('3'). ",sm->varNum);
     }
-    if(robot->joystick->isButtonTransition(2)>0 and sm->sbmvmtNum>0)
+    else if ((robot->joystick->isButtonTransition(2)>0 and sm->varNum == 6))
     {
-        sm->sbmvmtNum = sm->sbmvmtNum-1;
+        sm->varNum = 1;
+        spdlog::info("Current Var: {}. Add Var ('2'). Start Demo ('1'). Start Repro ('3').",sm->varNum);
     }
     
     if (sm->robotVerbose){
@@ -311,18 +331,14 @@ void M3StandbyPublishState::duringCode(void) {
         oss <<  "ForceReq:"<< mass * 9.8   << "\n";
         printFullStates(oss.str());
     }
-
-    // publish to ROS2 network
-    sm->get_node()->publish_task_dynamics(sm->sbmvmtNum);
 }
-void M3StandbyPublishState::exitCode(void) {
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
-    sm->sbmvmtNum = 0;
+void M3StandbyState::exitCode(void) {
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
     sm->robotVerbose = false;
-    if(robot->stopFT_Sensors())
-    {
-        spdlog::info("Stopping RFT");
-    }
+//     if(robot->stopFT_Sensors())
+//     {
+//         spdlog::info("Stopping RFT");
+//     }
 }
 
 /**
@@ -330,8 +346,8 @@ void M3StandbyPublishState::exitCode(void) {
  *
  */
 void M3LockState::entryCode(void) {
-    sm->stateID = 3;
-    sm->get_node()->publish_state_id(sm->stateID);
+    sm->stateID = "lock";
+    sm->get_node()->publish_state_var(sm->stateID,0);
     robot->setEndEffForceWithCompensation(VM3::Zero(), false);
     X0 = robot->getEndEffPosition();
     if(robot->startFT_Sensors())
@@ -352,6 +368,94 @@ void M3LockState::duringCode(void) {
 }
 void M3LockState::exitCode(void) {
     robot->setEndEffForceWithCompensation(VM3::Zero(), false);
+    sm->robotVerbose = false;
+    if(robot->stopFT_Sensors())
+    {
+        spdlog::info("Stopping RFT");
+    }
+}
+
+/**
+ * \brief Demo
+ * \Starts publishing emu task dynamics to subscribers when user starts the repetition
+ */
+void M3DemoState::entryCode(void) {
+    sm->stateID = "demo";
+    sm->get_node()->publish_state_var(sm->stateID,sm->varNum);
+    
+    // set EE force
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    if(robot->startFT_Sensors())
+    {
+        spdlog::info("Starting RFT");
+    }
+    
+    // Initialize logger
+    rcpputils::fs::path logDir = rcpputils::fs::path("logs/corc_recordings/FT_EMU") 
+                                  / sm->expID 
+                                  / sm->patientID 
+                                  / sm->subID 
+                                  / fmt::format("var{}", sm->varNum);
+    rcpputils::fs::create_directories(logDir);
+    std::string logPath = (logDir / ("FT_EMU_Demo.csv")).string();
+    stateLogger.initLogger("FT_EMU_Demo", logPath, LogFormat::CSV, true);
+    stateLogger.add(running(), "%Time(s)");
+    stateLogger.add(sm->repNum, "rep");
+    stateLogger.add(sm->sbmvmtNum, "sbmvmt");
+    stateLogger.add(robot->getEndEffPosition(), "X");
+    stateLogger.add(robot->getEndEffVelocityFiltered(), "dXFilt");
+    stateLogger.add(robot->getWrenches(), "F");
+    stateLogger.startLogger();
+
+    sm->repNum = 1;
+    sm->sbmvmtNum = 0;
+    spdlog::info("Var {}, Start Rep {} ('2'). End Var {} ('S').",sm->varNum,sm->repNum,sm->varNum);
+}
+void M3DemoState::duringCode(void) {
+
+    if(robot->joystick->isButtonTransition(2)>0 and sm->sbmvmtNum <= sm->maxSbmvmt)
+    {
+        sm->sbmvmtNum = sm->sbmvmtNum+1;
+        if (sm->sbmvmtNum <sm->maxSbmvmt){
+        spdlog::info("Var {}, Rep {}, Sbmvmt {}/{}. Add Sbmvmt ('2'). Redo Rep('3').",sm->varNum, sm->repNum,sm->sbmvmtNum,sm->maxSbmvmt);
+        }
+        else if (sm->sbmvmtNum == sm->maxSbmvmt){
+        spdlog::info("Var {}, Rep {}, Sbmvmt {}/{}. Stop Rep {} ('2'). Redo Rep('3').",sm->varNum, sm->repNum,sm->sbmvmtNum,sm->maxSbmvmt,sm->repNum);
+        }
+        else{
+        spdlog::info("Var {}, Rep {}. Sbmvmts finished. Go to next rep ('1') or redo current rep('3')",sm->varNum, sm->repNum);
+        }
+    }
+    if(robot->joystick->isButtonTransition(1)>0 and sm->sbmvmtNum > sm->maxSbmvmt)
+    {
+        sm->repNum = sm->repNum+1; sm->sbmvmtNum = 0;
+        spdlog::info("Var {}, Start Rep {} ('2'). End Var {} ('S').",sm->varNum,sm->repNum,sm->varNum);
+    }
+    if(robot->keyboard->getKeyUC()=='R' and sm->repNum > 1)
+    {
+        sm->repNum = sm->repNum-1; sm->sbmvmtNum = 0;
+        spdlog::info("Redoing Rep {}",sm->repNum);
+    }
+    if(robot->joystick->isButtonTransition(3)>0 and sm->sbmvmtNum > 0)
+    {
+        sm->sbmvmtNum = 0;
+        spdlog::info("Var {}, Redo Rep {} ('2'). End Var {} ('S').",sm->varNum,sm->repNum,sm->repNum,sm->varNum);
+    }
+
+    // publish emu task dynamics before end of sbmvmts to ROS2 network
+    if (sm->sbmvmtNum <= sm->maxSbmvmt)
+    {
+        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+    }
+    
+    if (sm->robotVerbose){
+        printFullStates();
+    }
+}
+void M3DemoState::exitCode(void) {
+    // set EE force
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    sm->repNum = 1;
     sm->sbmvmtNum = 0;
     sm->robotVerbose = false;
     if(robot->stopFT_Sensors())
@@ -361,3 +465,162 @@ void M3LockState::exitCode(void) {
 }
 
 
+/**
+ * \brief Learn state
+ * \start the learning on lfd SM, waits for the learning complete signal from lfd SM
+ */
+void M3LearnState::entryCode(void) { 
+    sm->stateID = "learn";
+    sm->get_node()->publish_state_var(sm->stateID,sm->varNum);
+    
+    sm->learn_finish = false;
+    
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
+}
+void M3LearnState::duringCode(void){ 
+    sessionParamInts = sm->get_node()->get_session_param_ints();
+    
+    if (sessionParamInts[1]>0){
+        sm->learn_finish=true;
+        // Extract from 3rd element to end and convert to bool
+        std::vector<bool> learn_success_bool;
+        std::transform(sessionParamInts.begin() + 2, sessionParamInts.end(),
+                       std::back_inserter(learn_success_bool),
+                       [](uint16_t val) { return val != 0; });
+        sm->learn_success = learn_success_bool;
+    }
+    
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+}
+void M3LearnState::exitCode(void) { 
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    sm->robotVerbose = false;
+
+       
+    std::string status_str = "Status=[ ";
+    for (bool val : sm->learn_success) {
+        status_str += (val ? "true " : "false ");
+    }
+    status_str += "]";
+    
+    spdlog::info("{}", status_str);
+    spdlog::info("Learning Complete. {}",status_str);
+}
+
+/**
+ * \brief NewTP state
+ * \set the TP for the current var to be reproduced by robot
+ */
+void M3NewTPState::entryCode(void) { 
+    sm->stateID = "new_tp";
+    sm->get_node()->publish_state_var(sm->stateID,sm->varNum);
+
+    // set EE force
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    if(robot->startFT_Sensors())
+    {
+        spdlog::info("Starting RFT");
+    }
+    
+    sm->sbmvmtNum = 0;
+    spdlog::info("Var {}. Add TP {}/{} ('2'). Redo Var {} TP ('3').",sm->varNum,sm->sbmvmtNum+1,sm->maxSbmvmt+1,sm->varNum);
+}
+void M3NewTPState::duringCode(void){   
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    
+    if(robot->joystick->isButtonTransition(2)>0 and sm->sbmvmtNum <= sm->maxSbmvmt)
+    {
+        sm->sbmvmtNum = sm->sbmvmtNum+1;
+        if (sm->sbmvmtNum <=sm->maxSbmvmt){
+            spdlog::info("Var {}. TP {}/{} Added. Add TP ('2'). Redo Var {} TP ('3')",sm->varNum, sm->sbmvmtNum, sm->maxSbmvmt+1,sm->varNum);
+        }
+        else{
+            spdlog::info("Var {}. TP {}/{} Complete. Redo Var {} TP ('3'). Go to Repro_LfD ('1')",sm->varNum, sm->sbmvmtNum, sm->maxSbmvmt+1,sm->varNum);
+            sm->lfd_repro_ready = true;
+        }
+        
+        // publish TP
+        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+    }
+    
+    if(robot->joystick->isButtonTransition(3)>0 and sm->sbmvmtNum > 0)
+    {
+        sm->sbmvmtNum = 0;
+        sm->lfd_repro_ready = false;
+        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+        spdlog::info("Var {}. Add TP {}/{} ('2'). Redo Var {} TP ('R','3'').",sm->varNum,sm->sbmvmtNum+1,sm->maxSbmvmt+1,sm->varNum);
+    }
+}
+void M3NewTPState::exitCode(void) { 
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    sm->robotVerbose = false;
+    sm->lfd_repro_ready = false;
+    sm->sbmvmtNum = 0;
+}
+
+/**
+ * \brief ReproLfD state
+ * \ reproduce interaction from the LfD process
+ */
+void M3ReproLfDState::entryCode(void) { 
+    sm->stateID = "repro_lfd";
+    sm->get_node()->publish_state_var(sm->stateID,sm->varNum);
+
+    // set EE force
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    if(robot->startFT_Sensors())
+    {
+        spdlog::info("Starting RFT");
+    }
+    
+    sm->repNum = 1;
+    sm->sbmvmtNum = 0;
+    spdlog::info("Var {}. Start Interaction {} ('2'). End Var {} ('S')",sm->varNum,sm->repNum,sm->repNum,sm->varNum);
+}
+void M3ReproLfDState::duringCode(void){   
+    // put this here so we can get the latest information 
+    if (start_interaction)
+    {
+        // to subscribe to the commanded wrenches
+        desired_wrench = sm->get_node()->get_desired_wrench();
+        if (desired_wrench.size() > 0)
+        {
+            std::cout << std::setprecision(3) << std::fixed << std::showpos;
+            std::cout << "desired_wrench\t=[ " << desired_wrench.transpose() <<" ]\t";
+            std::cout <<  std::endl;
+            std::cout <<  std::noshowpos;
+            robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+        }
+    }
+     
+    if(robot->joystick->isButtonTransition(2)>0 and !start_interaction)
+    {
+        sm->sbmvmtNum = 1;
+        start_interaction = true;
+        spdlog::info("Var {}. Interaction {} Started. Stop Interaction {} ('1'). End Var {} ('S')",sm->varNum,sm->repNum,sm->repNum,sm->varNum);
+    }
+    if(robot->joystick->isButtonTransition(1)>0 and start_interaction)
+    {
+        sm->sbmvmtNum = 0;
+        sm->repNum = sm->repNum+1;
+        start_interaction = false;
+        sm->get_node()->reset_desired_wrench();
+        spdlog::info("Var {}. Interaction {} Stopped. Start Interaction {} ('2'). End Var {} ('S')",sm->varNum,sm->repNum-1,sm->repNum,sm->varNum);
+    }
+    
+    sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+
+    if (sm->robotVerbose){
+        printFullStates();
+    }
+}
+void M3ReproLfDState::exitCode(void) { 
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    sm->robotVerbose = false;
+    sm->repNum = 1;
+    sm->sbmvmtNum = 0;
+    if(robot->stopFT_Sensors())
+    {
+        spdlog::info("Stopping RFT");
+    }
+}

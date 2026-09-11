@@ -47,13 +47,11 @@ class FT_EMU_ROS2_State : public State {
     FT_EMU_ROS2_State(FT_RobotM3* M3, FT_EMU_ROS2 *sm_, const char *name = NULL): State(name), robot(M3), sm(sm_){spdlog::debug("Created FT_EMU_ROS2_State {}", name);};
    private:
     void entry(void) final {
-        //Actual state entry
         entryCode();
     };
     void during(void) final;
     void exit(void) final {
         exitCode();
-
         if(stateLogger.isInitialised())
             stateLogger.endLog();
     };
@@ -78,11 +76,14 @@ class FT_EMU_ROS2_State : public State {
 class M3InitState : public FT_EMU_ROS2_State {
 
    public:
-    M3InitState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Init State"):FT_EMU_ROS2_State(M3, sm, name){};
+    M3InitState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Init"):FT_EMU_ROS2_State(M3, sm, name){};
     
     void entryCode(void);
     void duringCode(void);
     void exitCode(void);
+   private:
+    std::vector<std::string> sessionParam;
+    std::vector<uint16_t> sessionParamInts;
 };
 
 /**
@@ -108,7 +109,7 @@ class M3CalibState : public FT_EMU_ROS2_State {
 };
 
 /**
- * \brief Force Torque calibration of M3. Collects the first 100 samples and sets that as static bias
+ * \brief Force Torque calibration of M3. Collects the first 1000 samples and sets that as static bias
  *
  */
 class M3FTCalibState : public FT_EMU_ROS2_State {
@@ -129,20 +130,20 @@ class M3FTCalibState : public FT_EMU_ROS2_State {
 };
 
 /**
- * \brief Start publishing robot state. Provide end-effector mass compensation on M3. 
+ * \brief Standby: User to specify which variation to practice
+ * \Provide end-effector mass compensation on M3. 
  * \details Mass is controllable through keyboard inputs. Assumes drives in torque control already.
  */
-class M3StandbyPublishState : public FT_EMU_ROS2_State {
+class M3StandbyState : public FT_EMU_ROS2_State {
 
    public:
-    M3StandbyPublishState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Standby Publish"):FT_EMU_ROS2_State(M3, sm, name){};
+    M3StandbyState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Standby"):FT_EMU_ROS2_State(M3, sm, name){};
 
     void entryCode(void);
     void duringCode(void);
     void exitCode(void);
 
    private:
-    std::vector<double> accel;
     const double transition_t = 1.;        //!< Time to apply progressive transition (no friction comp)
     const double mass_limit = 10;          //!< Maximum applicable mass (+ and -)
     double mass = 0;                       //!< Desired mass to apply: might differ from applied_mass during transition (i.e. setMass)
@@ -170,5 +171,71 @@ class M3LockState : public FT_EMU_ROS2_State {
     double d = 3.;                   //! Impedance derivative gain (damper)
 };
 
+/**
+ * \brief Demo state
+ * \Starts publishing emu task dynamics to subs
+ */
+class M3DemoState : public FT_EMU_ROS2_State {
+
+   public:
+    M3DemoState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Demo"):FT_EMU_ROS2_State(M3, sm, name){};
+
+    void entryCode(void);
+    void duringCode(void);
+    void exitCode(void);
+
+   private:
+};
+
+/**
+ * \brief Learn state
+ * \start the learning on lfd SM
+ */
+class M3LearnState : public FT_EMU_ROS2_State {
+
+   public:
+    M3LearnState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Learn"):FT_EMU_ROS2_State(M3, sm, name){};
+
+    void entryCode(void);
+    void duringCode(void);
+    void exitCode(void);
+
+   private:
+    std::vector<uint16_t> sessionParamInts;
+};
+
+/**
+ * \brief NewTP state
+ * \Publish task parameters to the lfd SM
+ */
+class M3NewTPState : public FT_EMU_ROS2_State {
+
+   public:
+    M3NewTPState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 New TP"):FT_EMU_ROS2_State(M3, sm, name){};
+
+    void entryCode(void);
+    void duringCode(void);
+    void exitCode(void);
+
+   private:
+};
+
+/**
+ * \brief ReproLfD state
+ * \ reproduce interaction from the LfD process
+ */
+class M3ReproLfDState : public FT_EMU_ROS2_State {
+
+   public:
+    M3ReproLfDState(FT_RobotM3 * M3, FT_EMU_ROS2 *sm, const char *name = "M3 Repro LfD"):FT_EMU_ROS2_State(M3, sm, name){};
+
+    void entryCode(void);
+    void duringCode(void);
+    void exitCode(void);
+
+   private:
+   bool start_interaction = false;
+   Eigen::VectorXd desired_wrench;
+};
 
 #endif

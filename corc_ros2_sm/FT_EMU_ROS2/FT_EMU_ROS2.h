@@ -39,9 +39,26 @@ class FT_EMU_ROS2 : public StateMachine {
         
         double MassComp = 0;         //!< Mass comp value used for standard operations
         bool robotVerbose = false;
-        uint16_t stateID = 0;
+        
+        // session params
+        std::string expID = "unknown";
+        std::string patientID = "unknown";
+        std::string subID = "unknown";
+        std::string learnOutput = "unknown";
+        uint16_t maxSbmvmt = 0;
+        
+        // learning status
+        bool learn_finish = false;
+        std::vector<bool> learn_success = {false,false,false,false,false,false};
+        
+        // repetition param
+        std::string stateID = "init";
+        uint16_t varNum = 1;
+        uint16_t repNum = 1;
         uint16_t sbmvmtNum = 0;
-
+        
+        bool lfd_repro_ready = false;
+        
     private:
         std::shared_ptr<FT_EMU_ROS2_Node> m_Node;
         
