@@ -85,7 +85,6 @@ class xsens_server(QObject):
             self.Connected = True
             self.sampling = 0
             self.server_socket.setblocking(True)
-            print(self.server_socket.getblocking())
         except Exception as e:
             print('XSENS: Connection failed! (', e, ')')
             self.Connected = False
@@ -103,11 +102,8 @@ class xsens_server(QObject):
             time_bytes = 24+16
             raw_message = self.server_conn.recv(ja+time_bytes)
             
-
-            # print()
-            
             #timecode
-            timecode = f"{parse_string(raw_message[-40:-40+6])}\n"
+            timecode = f"{parse_string(raw_message[-40:-40+6])} "
             timecode += f"{parse_string(raw_message[-16:])}\n"
             
             #joints identifier
@@ -118,14 +114,8 @@ class xsens_server(QObject):
             self.left=left
             self.timecode = timecode
             self.Connected=True
-            # print("WHERE THE HELL")
-        except Exception as e:
-            # print(f"Error: {e}")
-            # print(raw_message)
-            # print(len(raw_message))
-            # print(raw_message)
-            
-            
+        except Exception as e:        
+            print(e)
             self.right={"dict":place_holder_angles,"list":list(place_holder_angles.values())}
             self.left={"dict":place_holder_angles,"list":list(place_holder_angles.values())}
             self.timecode = "ERROR TIME"
@@ -143,18 +133,19 @@ class xsens_server(QObject):
         self.get_latest()
         if(self.right and self.left and self.Connected):
             data = {
+                "topic":"xsens",
                 "timecode":self.timecode,
-                "xsens_fps":self.xsens_fps,
+                "fps":self.xsens_fps,
                 "right":self.right,
                 "left":self.left,
             }
         else:
             data = {
+                "topic":"xsens",
                 "timecode":"",
-                "xsens_fps":self.xsens_fps,
+                "fps":self.xsens_fps,
                 "right":self.right,
                 "left":self.left,
-                
             }
         self.data_ready.emit(data)
 
@@ -213,7 +204,7 @@ class MainWindow(QMainWindow):
 
     def update_label(self, text):
         if text:
-            txt = text["timecode"] + "XSENS FPS: " + f"{text['xsens_fps']:.2f}\n"
+            txt = text["timecode"] + "XSENS FPS: " + f"{text['fps']:.2f}\n"
             right = text["right"]["dict"]
             left = text["left"]["dict"]
 

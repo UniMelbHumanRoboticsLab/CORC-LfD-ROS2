@@ -3,6 +3,7 @@ import os, sys,json
 for mod in [m for m in sys.modules if 'PyQt5' in m]:
     del sys.modules[mod]
     
+sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 import numpy as np

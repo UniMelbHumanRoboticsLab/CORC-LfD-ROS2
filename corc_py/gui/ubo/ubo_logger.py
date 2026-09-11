@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, Signal,QTimer,Slot,QElapsedTimer,Qt
 NUM_RFT = 3
 rft_key = ["clav","ua","fa"]
 class ubo_logger(QObject):
-    time_ready = Signal(dict)
+    data_ready = Signal(dict)
     bias_ready = Signal(dict)
     collect_finish = Signal()
     stopped = Signal()
@@ -30,6 +30,7 @@ class ubo_logger(QObject):
         self.skeleton = ub(self.body_params_rbt,model="ubo",arm_side="right")
         
         self.sensors_ready_flag = False
+        self.started = False
         
         # FPS Calculator
         self.logger_frame_count = 0
@@ -94,10 +95,11 @@ class ubo_logger(QObject):
                 
         # emit the signal
         data = {
+            "topic":"logger",
+            "fps":self.logger_fps,
             "print_text":print_text,
-            "logger_fps":self.logger_fps
         }
-        self.time_ready.emit(data)
+        self.data_ready.emit(data)
     
     """
     Initialization Callback
@@ -105,6 +107,7 @@ class ubo_logger(QObject):
     @Slot()
     def start_worker(self):
         if self.sensors_ready_flag:
+            self.started = True
             self.poll_timer = QTimer()
             self.poll_timer.setTimerType(Qt.PreciseTimer)
             self.poll_timer.timeout.connect(self.log_current_data)
@@ -122,10 +125,11 @@ class ubo_logger(QObject):
                 self.bias_arr = []
         else:
             data = {
+                "topic":"logger",
                 "print_text":"Bro wait\n",
-                "logger_fps":0
+                "fps":0
             }
-            self.time_ready.emit(data)
+            self.data_ready.emit(data)
         
     """
     External Signals Callbacks
@@ -134,10 +138,11 @@ class ubo_logger(QObject):
     def sensors_ready(self): # [self.rft_data_arr,self.rft_pose,self.rft_fps]
         self.sensors_ready_flag = True
         data = {
+            "topic":"logger",
             "print_text":"Sensors Ready\n",
-            "logger_fps":0
+            "fps":0
         }
-        self.time_ready.emit(data)
+        self.data_ready.emit(data)
     def update_corc(self,corc_response): # [self.rft_data_arr,self.rft_pose,self.rft_fps]
         self.corc_response = corc_response
     @Slot(dict)
@@ -151,77 +156,79 @@ class ubo_logger(QObject):
     @Slot()
     def redo_take(self):
         # reset everything
-        if self.init_args["corc"]["on"]:
-            self.corc_arr = []
-        if self.init_args["xsens"]["on"]:
-            self.xsens_arr = []
-        self.logger_start_time = self.logger_timer.elapsed()
-        
-        self.take_num -= 1
-        self.take_text = f"{self.take_num}"
-        print(f"Redo {self.subject_id}-{self.patient_id}-{self.var_id} Take {self.take_text}")
+        if self.take_num > 0:
+            if self.init_args["corc"]["on"]:
+                self.corc_arr = []
+            if self.init_args["xsens"]["on"]:
+                self.xsens_arr = []
+            self.logger_start_time = self.logger_timer.elapsed()
+            
+            self.take_num -= 1
+            self.take_text = f"{self.take_num}"
+            print(f"Redo {self.subject_id}-{self.patient_id}-{self.var_id} Take {self.take_text}")
     @Slot()
     def reset_logger(self):
-        print(f"\nTake {self.take_text} Elapsed Time: {self.elapsed_time}")
-
-        if hasattr(self, 'corc_response') and hasattr(self, 'xsens_response'):
-            joints = ['trunk_ie','trunk_aa','trunk_fe',
-                      'clav_dep_ev','clav_prot_ret',
-                      'shoulder_fe','shoulder_aa','shoulder_ie',
-                      'elbow_fe','elbow_ps',
-                      'wrist_fe','wrist_dev']
-            xsens_column = ["timecode"]+[f"{joint}_{side}" for side in ["right","left"] for joint in joints]
-            corc_column = [
-                        "corc time",
-                        "F1x","F1y","F1z","T1x","T1y","T1z",
-                        "F2x","F2y","F2z","T2x","T2y","T2z",
-                        "F3x","F3y","F3z","T3x","T3y","T3z",
-                        "elapsed_time"
-                       ]
-            total_arr = np.hstack((np.array(self.xsens_arr),np.array(self.corc_arr)))
-            df = pd.DataFrame(total_arr,columns=xsens_column+corc_column)
-            self.save_file(path=f"{self.save_path}/",df=df,item=f"UBORecord{self.take_text}Log")
-            
-            """
-            emit the average installation bias for this variation to the GUI avd save everything as well
-            """
-            if self.take_num == 0:
-                mean_bias = np.mean(np.array(self.bias_arr),axis=0)
-                for i in range(3):
-                    bias = mean_bias[i*6:i*6+6]
-                    
-                    txt = ""
-                    for w in bias:
-                        txt+=f"{w:.4f},"
-                    print(f"Installation Bias{i}:",txt)
-                    
-                self.bias_ready.emit({
-                    "bias":mean_bias.tolist()
-                        })
-                
-                bias_column = [
+        if self.started:
+            print(f"\nTake {self.take_text} Elapsed Time: {self.elapsed_time}")
+    
+            if hasattr(self, 'corc_response') and hasattr(self, 'xsens_response'):
+                joints = ['trunk_ie','trunk_aa','trunk_fe',
+                          'clav_dep_ev','clav_prot_ret',
+                          'shoulder_fe','shoulder_aa','shoulder_ie',
+                          'elbow_fe','elbow_ps',
+                          'wrist_fe','wrist_dev']
+                xsens_column = ["timecode"]+[f"{joint}_{side}" for side in ["right","left"] for joint in joints]
+                corc_column = [
+                            "corc time",
                             "F1x","F1y","F1z","T1x","T1y","T1z",
                             "F2x","F2y","F2z","T2x","T2y","T2z",
                             "F3x","F3y","F3z","T3x","T3y","T3z",
+                            "elapsed_time"
                            ]
-                bias_arr = np.array(self.bias_arr)
-                df = pd.DataFrame(bias_arr,columns=bias_column)
-                self.save_file(path=f"{self.save_path}/",df=df,item="UBOConstBiasLog")
-                np.save(f"{self.save_path}/UBOAvgBias", mean_bias)
-
-        # reset everything
-        if self.init_args["corc"]["on"]:
-            self.corc_arr = []
-        if self.init_args["xsens"]["on"]:
-            self.xsens_arr = []
-        self.logger_start_time = self.logger_timer.elapsed()
+                total_arr = np.hstack((np.array(self.xsens_arr),np.array(self.corc_arr)))
+                df = pd.DataFrame(total_arr,columns=xsens_column+corc_column)
+                self.save_file(path=f"{self.save_path}/",df=df,item=f"UBORecord{self.take_text}Log")
+                
+                """
+                emit the average installation bias for this variation to the GUI avd save everything as well
+                """
+                if self.take_num == 0:
+                    mean_bias = np.mean(np.array(self.bias_arr),axis=0)
+                    for i in range(3):
+                        bias = mean_bias[i*6:i*6+6]
+                        
+                        txt = ""
+                        for w in bias:
+                            txt+=f"{w:.4f},"
+                        print(f"Installation Bias{i}:",txt)
+                        
+                    self.bias_ready.emit({
+                        "bias":mean_bias.tolist()
+                            })
+                    
+                    bias_column = [
+                                "F1x","F1y","F1z","T1x","T1y","T1z",
+                                "F2x","F2y","F2z","T2x","T2y","T2z",
+                                "F3x","F3y","F3z","T3x","T3y","T3z",
+                               ]
+                    bias_arr = np.array(self.bias_arr)
+                    df = pd.DataFrame(bias_arr,columns=bias_column)
+                    self.save_file(path=f"{self.save_path}/",df=df,item="UBOConstBiasLog")
+                    np.save(f"{self.save_path}/UBOAvgBias", mean_bias)
+    
+            # reset everything
+            if self.init_args["corc"]["on"]:
+                self.corc_arr = []
+            if self.init_args["xsens"]["on"]:
+                self.xsens_arr = []
+            self.logger_start_time = self.logger_timer.elapsed()
+                
+            self.take_num += 1
+            self.take_text = f"{self.take_num}"
             
-        self.take_num += 1
-        self.take_text = f"{self.take_num}"
-        
-        if self.take_num > 4:
-            print(f"Finished collecting {self.subject_path}/{self.var_id}")
-            self.collect_finish.emit()
+            if self.take_num > 4:
+                print(f"Finished collecting {self.subject_path}/{self.var_id}")
+                self.collect_finish.emit()
         
     """
     Helper Function

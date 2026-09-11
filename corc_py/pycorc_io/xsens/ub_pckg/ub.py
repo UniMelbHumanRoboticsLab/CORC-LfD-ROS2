@@ -27,10 +27,25 @@ sys.path.append(os.path.join(os.path.dirname(__file__),".."))
 
 class ub():
     """Init Functions"""
-    def __init__(self, body_params={'torso':0.5,'clav':0.2,'ua_l': 0.3, 'fa_l': 0.25, 'ha_l': 0.1, 'm_ua': 2.0, 'm_fa':1.1+0.23+0.6,"shoulder_aa_offset":[16],"ft_offsets": [0.1,0.1,0.1]},model='xsens',arm_side="right"):
+    def __init__(self, body_params={'torso':0.5,'clav':0.2,'ua_l': 0.3, 'fa_l': 0.25, 'ha_l': 0.1, 'm_ua': 2.0, 'm_fa':1.1+0.23+0.6,"shoulder_aa_offset":[16],"ft_offsets": [0.1,0.1,0.1]},model='xsens',arm_side="right",
+                 ft_grav=None,removed_bias=None):
         self.model = model
-        if self.model == 'ubo':
-            self.ub_model = ubo_robot(
+        if self.model == 'emu':
+            self.ub_model = emu(
+                torso=body_params['torso'],
+                clav=body_params['clav'],
+                ua_l=body_params['ua_l'],
+                fa_l=body_params['fa_l'],
+                ha_l=body_params['ha_l'],
+                m_ua=body_params['m_ua'],
+                m_fa=body_params['m_fa'],
+                shoulder_aa_offset=body_params['shoulder_aa_offset'],
+                ft_offsets =body_params['ft_offsets'],
+                arm_side=arm_side
+            )
+            self.ee_names = ["hand","wrist"]
+        elif self.model == 'ubo':
+            self.ub_model = ubo(
                 torso=body_params['torso'],
                 clav=body_params['clav'],
                 ua_l=body_params['ua_l'],
@@ -66,6 +81,8 @@ class ub():
 
         #Default gravity vector (can be changed)
         self.ub_model[0].gravity=[0,0,-9.81]
+        self.ft_grav = ft_grav
+        self.removed_bias = removed_bias
     def ArmMassFromBodyMass(self, body_mass: float):
         '''Calculate arm mass from overall body mass based on anthropomorphic rules
         from Drillis et al., Body Segment Parameters, 1964. Table 7'''
@@ -90,8 +107,9 @@ class ub():
         y = np.array([joints_pose[0].t[1],joints_pose[4].t[1],joints_pose[6].t[1],joints_pose[8].t[1],joints_pose[10].t[1]])
         z = np.array([joints_pose[0].t[2],joints_pose[4].t[2],joints_pose[6].t[2],joints_pose[8].t[2],joints_pose[10].t[2]])
         ax.plot(x,y,z,marker='.', linestyle='-', color=color)
-    def plot_joints_ees_frame(self,joints_pose,ees_pose,show_joint_frames=True,show_ee_frames=True):
-        fig,ax = create_custom_3d_fig(num="UB")
+    def plot_joints_ees_frame(self,joints_pose,ees_pose,show_joint_frames=True,show_ee_frames=True,ax=None):
+        if ax == None:
+            fig,ax = create_custom_3d_fig(num="UB")
         # fig = plt.figure()
         # ax = fig.add_subplot(1,1,1,projection='3d')
         ax.set_xlim(-0.5,0.5)
@@ -228,7 +246,7 @@ if __name__ == "__main__":
         "ft_offsets": {
             "clav": [0.0,100.0],
             "ua":   [0.0,130.0],
-            "fa":   [0.0,200.0]
+            "fa":   [55.0,200.0]
         },
         "ft_grav": {
             "clav": 0,
@@ -246,8 +264,8 @@ if __name__ == "__main__":
                     'm_fa': 1.1+0.23+0.6,
                     "shoulder_aa_offset": np.array(body_params["shoulder_aa_offset"]),
                     "ft_offsets": body_params["ft_offsets"]}
-    ub_xsens = ub(body_params_rbt,model="ubo",arm_side="right")
-    ub_xsens_left = ub(body_params_rbt,model="ubo",arm_side="left")
+    ub_xsens = ub(body_params_rbt,model="emu",arm_side="right")
+    ub_xsens_left = ub(body_params_rbt,model="emu",arm_side="left")
 
     """
     Sanity check your UA model here

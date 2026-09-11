@@ -56,12 +56,25 @@ def parse_UL_joint_angle(message: bytes):
     JOINT_LEFT_WRIST = 7
     JOINT_TRUNK_A = 8
     JOINT_TRUNK_B = 9
+    
 
+    # if np.abs(x_arr[JOINT_RIGHT_SHOULDER])>45:
+    #     from scipy.spatial.transform import Rotation
+    #     shoulder_eulerold = [z_arr[JOINT_RIGHT_SHOULDER],
+    #                           x_arr[JOINT_RIGHT_SHOULDER],
+    #                           y_arr[JOINT_RIGHT_SHOULDER]]
+    #     # Convert ZXY Euler angles to rotation object
+    #     rotation = Rotation.from_euler('zxy', shoulder_eulerold, degrees=True)
+    #     # Convert rotation object to XYZ Euler angles
+    #     shoulder_euler = rotation.as_euler('xzy', degrees=True)
+    #     z_arr[JOINT_RIGHT_SHOULDER],x_arr[JOINT_RIGHT_SHOULDER],y_arr[JOINT_RIGHT_SHOULDER] = shoulder_euler[1],shoulder_euler[0],shoulder_euler[2]
+    #     print(shoulder_euler,[z_arr[JOINT_RIGHT_SHOULDER],x_arr[JOINT_RIGHT_SHOULDER],y_arr[JOINT_RIGHT_SHOULDER]])
+        
     right_dict = {
         'trunk_ie':y_arr[JOINT_TRUNK_A],
         'trunk_aa':x_arr[JOINT_TRUNK_B],
         'trunk_fe':z_arr[JOINT_TRUNK_B],
-        'clav_dep_ev':z_arr[JOINT_RIGHT_T4_SHOULDER],
+        'clav_dep_ev':x_arr[JOINT_RIGHT_T4_SHOULDER],
         'clav_prot_ret':y_arr[JOINT_RIGHT_T4_SHOULDER],
         'shoulder_fe':z_arr[JOINT_RIGHT_SHOULDER],
         'shoulder_aa':x_arr[JOINT_RIGHT_SHOULDER],
@@ -76,7 +89,7 @@ def parse_UL_joint_angle(message: bytes):
         'trunk_ie':y_arr[JOINT_TRUNK_A],
         'trunk_aa':x_arr[JOINT_TRUNK_B],
         'trunk_fe':z_arr[JOINT_TRUNK_B],
-        'clav_dep_ev':z_arr[JOINT_LEFT_T4_SHOULDER],
+        'clav_dep_ev':x_arr[JOINT_LEFT_T4_SHOULDER],
         'clav_prot_ret':y_arr[JOINT_LEFT_T4_SHOULDER],
         'shoulder_fe':z_arr[JOINT_LEFT_SHOULDER],
         'shoulder_aa':x_arr[JOINT_LEFT_SHOULDER],

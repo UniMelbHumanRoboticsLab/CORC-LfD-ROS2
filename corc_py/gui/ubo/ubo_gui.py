@@ -3,6 +3,7 @@ import os, sys,json
 for mod in [m for m in sys.modules if 'PyQt5' in m]:
     del sys.modules[mod]
     
+sys.path.append(os.path.dirname(__file__))
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 import numpy as np
@@ -40,7 +41,6 @@ class ubo_gui(pycorc_gui):
         self.body_params_rbt,self.ft_grav,self.removed_bias = get_subject_params(body_path)
         self.init_bias = np.load(f"{body_path}/UBOAvgBias.npy")
         self.bias_response = np.array([0 for i in range(18)])
-        
         for dict_type,param_dict in zip(["BODY PARAMS","FT_GRAV","REMOVED_BIAS"],[self.body_params_rbt,self.ft_grav,self.removed_bias]):
             print()
             print(dict_type)
@@ -62,6 +62,10 @@ class ubo_gui(pycorc_gui):
         """
         Initilization
         """
+        self.threads={}
+        self.workers={}
+        self.labels={}
+        self.responses={}
         self.init_IOs()
         self.init_shortcuts()
 
@@ -73,26 +77,7 @@ class ubo_gui(pycorc_gui):
         print(f"Threads Opened:{self.num_opened_threads}")
         
         if self.num_opened_threads == self.requested_threads:
-            QMetaObject.invokeMethod(self.logger_worker , "sensors_ready", Qt.ConnectionType.QueuedConnection)
-    def init_corc(self):
-        # init response label
-        self.corc_label = self.init_response_label(size=[525,200])
-        # init corc thread and worker
-        self.corc_thread = QThread()
-        self.corc_worker = corc_FLNL_client(ip=self.corc_args["ip"],port=self.corc_args["port"])
-        # init corc live stream plot
-        self.ubo_F_live_stream_plots = []
-        self.ubo_M_live_stream_plots = []
-        if self.gui_args["on"] and self.gui_args["force"]:
-            for i in range(NUM_RFT):
-                self.ubo_F_live_stream_plots.append(self.add_live_stream_plot(live_stream=self.ubo_wrenches_live_stream,sensor_name= f"UBO_{i} Force",unit="N",dim=3))
-                self.ubo_M_live_stream_plots.append(self.add_live_stream_plot(live_stream=self.ubo_wrenches_live_stream,sensor_name= f"UBO_{i} Moment",unit="Nm",dim=3))
-    def init_xsens(self):
-        # init response label
-        self.xsens_label = self.init_response_label(size=[300,200])
-        # init corc thread and worker
-        self.xsens_thread = QThread()
-        self.xsens_worker = xsens_server(ip=self.xsens_args["ip"],port=self.xsens_args["port"])
+            QMetaObject.invokeMethod(self.workers["logger"] , "sensors_ready", Qt.ConnectionType.QueuedConnection)
     def init_skeleton(self):
         # init ub model
         self.skeleton = {
@@ -119,24 +104,38 @@ class ubo_gui(pycorc_gui):
                     else:
                         forces = [0 for ee_pose in robot_ee]
                     self.skeleton[side]["forces"] = forces
-    def init_logger(self):
-        # init response label
-        self.logger_label = self.init_response_label(size=[600,300],fontsize=50)
-        self.logger_thread = QThread()
-        self.logger_worker = ubo_logger(init_args = self.init_args["init_flags"],
-                                        session_data  = self.session_data)
+    def init_worker(self,topic):
+        label = self.init_response_label(size=[525,200])
+        self.labels[topic] = label
+        thread = QThread()
+        self.threads[topic] = thread
+        if topic =="corc":
+            worker = corc_FLNL_client(ip=self.corc_args["ip"],port=self.corc_args["port"])
+            # init corc live stream plot
+            self.ubo_F_live_stream_plots = []
+            self.ubo_M_live_stream_plots = []
+            if self.gui_args["on"] and self.gui_args["force"]:
+                for i in range(NUM_RFT):
+                    self.ubo_F_live_stream_plots.append(self.add_live_stream_plot(live_stream=self.ubo_wrenches_live_stream,sensor_name= f"UBO_{i} Force",unit="N",dim=3))
+                    self.ubo_M_live_stream_plots.append(self.add_live_stream_plot(live_stream=self.ubo_wrenches_live_stream,sensor_name= f"UBO_{i} Moment",unit="Nm",dim=3))
+        elif topic == "xsens":
+            worker = xsens_server(ip=self.xsens_args["ip"],port=self.xsens_args["port"])
+        elif topic == "logger":
+            worker = ubo_logger(init_args=self.init_args["init_flags"],session_data=self.session_data)
+        self.workers[topic] = worker
+    
     def init_shortcuts(self):
         # to start / stop logging at button press
         if self.log_args["on"]:
             # to start logging
             start_log = QShortcut("S", self)
-            start_log.activated.connect(self.logger_worker.start_worker)
+            start_log.activated.connect(self.workers["logger"].start_worker)
             # to stop logging and close everything
-            stop_log = QShortcut("enter", self)
-            stop_log.activated.connect(self.logger_worker.reset_logger)
+            next_log = QShortcut("enter", self)
+            next_log.activated.connect(self.workers["logger"].reset_logger)
             # to redo previous take
             redo_log = QShortcut("R", self)
-            redo_log.activated.connect(self.logger_worker.redo_take)
+            redo_log.activated.connect(self.workers["logger"].redo_take)
         close = QShortcut("Q", self)
         close.activated.connect(self.gui_timer.stop)
         close.activated.connect(self.close_workers)
@@ -147,96 +146,60 @@ class ubo_gui(pycorc_gui):
         """
         self.init_skeleton()
         if self.corc_args["on"]:
-            self.init_corc()
+            self.init_worker("corc")
         if self.xsens_args["on"]:
-            self.init_xsens()
+            self.init_worker("xsens")
         if self.log_args["on"]:
-            self.init_logger()
-            self.logger_response = {
-            "print_text":"Idle\n",
-            "logger_fps":0.0
-        }
+            self.init_worker("logger")
+            self.responses["logger"] = {"print_text":"Idle\n",
+                                        "fps":0.0}
         
         """
         Move sensor worker to thread 
         Connect intersensor signals
-        Connect signals to sensor GUI callbacks
         Connect thread start to start sensor worker, update number of open threads
         Connect worker stop to stop thread at closeup
         Connect thread finished to close app
+        Connect signals to sensor GUI callbacks
         """
-        if self.corc_args["on"]:
+        for topic in self.workers:
             # move worker to thread
-            self.corc_worker.moveToThread(self.corc_thread)
-            # connect to gui
-            self.corc_worker.data_ready.connect(self.update_corc,type=Qt.ConnectionType.QueuedConnection)
+            self.workers[topic].moveToThread(self.threads[topic])
             # connect thread start to start worker   
-            self.corc_thread.started.connect(self.corc_worker.start_worker)
-            self.corc_thread.started.connect(self.add_opened_threads)
+            self.threads[topic].started.connect(self.add_opened_threads)
+            self.threads[topic].started.connect(self.workers[topic].start_worker)
             # connect worker stop to stop thread at closeup
-            self.corc_worker.stopped.connect(self.corc_thread.exit)
+            self.workers[topic].stopped.connect((self.threads[topic]).exit)
             # connect thread finished to close app
-            self.corc_thread.finished.connect(self.close_app)
-        if self.xsens_args["on"]:
-            # move worker to thread
-            self.xsens_worker.moveToThread(self.xsens_thread)
+            self.threads[topic].finished.connect(self.close_app)
             # connect to gui
-            self.xsens_worker.data_ready.connect(self.update_xsens,type=Qt.ConnectionType.QueuedConnection)
-            # connect thread start to start worker   
-            self.xsens_thread.started.connect(self.xsens_worker.start_worker)
-            self.xsens_thread.started.connect(self.add_opened_threads)
-            # connect worker stop to stop thread at closeup
-            self.xsens_worker.stopped.connect(self.xsens_thread.exit)
-            # connect thread finished to close app
-            self.xsens_thread.finished.connect(self.close_app)
-        if self.log_args["on"]:
-            # move worker to thread
-            self.logger_worker.moveToThread(self.logger_thread)
-            # connect corc and xsens to logger
-            if self.corc_args["on"]:
-                self.corc_worker.data_ready.connect(self.logger_worker.update_corc,type=Qt.ConnectionType.QueuedConnection)
-            if self.xsens_args["on"]:
-                self.xsens_worker.data_ready.connect(self.logger_worker.update_xsens,type=Qt.ConnectionType.QueuedConnection)
-            # connect logger to sensor gui
-            self.logger_worker.time_ready.connect(self.update_logger,type=Qt.ConnectionType.QueuedConnection)
-            self.logger_worker.bias_ready.connect(self.update_bias,type=Qt.ConnectionType.QueuedConnection)
-            # connect thread start to add opened threads  
-            self.logger_thread.started.connect(self.add_opened_threads)
-            # connect worker stop to stop thread at closeup
-            self.logger_worker.stopped.connect(self.logger_thread.exit)
-            # connect worker collect finish to stop app
-            self.logger_worker.collect_finish.connect(self.gui_timer.stop)
-            self.logger_worker.collect_finish.connect(self.close_workers)
-            # connect thread finished to close app
-            self.logger_thread.finished.connect(self.close_app)
-
+            self.workers[topic].data_ready.connect(self.update_response,type=Qt.ConnectionType.QueuedConnection)
+            
+            if self.log_args["on"] and topic == "logger":
+                # connect corc and xsens to logger
+                if self.corc_args["on"]:
+                    self.workers["corc"].data_ready.connect(self.workers[topic].update_corc,type=Qt.ConnectionType.QueuedConnection)
+                if self.xsens_args["on"]:
+                    self.workers["xsens"].data_ready.connect(self.workers[topic].update_xsens,type=Qt.ConnectionType.QueuedConnection)
+                # connect bias collection to sensor gui
+                self.workers[topic].bias_ready.connect(self.update_bias,type=Qt.ConnectionType.QueuedConnection)
+                # connect logger collect finish to stop app
+                self.workers[topic].collect_finish.connect(self.gui_timer.stop)
+                self.workers[topic].collect_finish.connect(self.close_workers)
         """
         Start threads
         """
-        if self.corc_args["on"]:
-            self.corc_thread.start()
-            self.corc_thread.setPriority(QThread.Priority.TimeCriticalPriority)
-        if self.xsens_args["on"]:
-            self.xsens_thread.start()
-            self.xsens_thread.setPriority(QThread.Priority.TimeCriticalPriority)
-        if self.log_args["on"]:
-            self.logger_thread.start()
-            self.logger_thread.setPriority(QThread.Priority.TimeCriticalPriority)
-        
+        for topic in self.workers:
+            self.threads[topic].start()
+            self.threads[topic].setPriority(QThread.Priority.TimeCriticalPriority)
     """
     Update Sensor Variable Callbacks
     """
     @Slot(dict)
-    def update_corc(self,corc_response):
-        self.corc_response = corc_response
-    def update_xsens(self,xsens_response):
-        self.xsens_response = xsens_response
-    @Slot(dict)
-    def update_logger(self,logger_response):
-        self.logger_response = logger_response
+    def update_response(self,response):
+        self.responses[response["topic"]] = response
     def update_bias(self,bias_response):
         self.bias_response = bias_response["bias"]
-
     """
     Update Main GUI Helper Functions and Callback
     """
@@ -246,84 +209,81 @@ class ubo_gui(pycorc_gui):
             # update live stream time buffer
             if self.gui_args["force"]:
                 self.update_live_stream_buffer(live_stream=self.ubo_wrenches_live_stream)
-        if hasattr(self, 'corc_response'):
-            # update rft info
-            corc_data = self.corc_response["raw_data"]
-            fps = self.corc_response["corc_fps"]
-            txt = ""
-
-            # get the orientation of the sensors if exist:
-            if hasattr(self, 'xsens_response'):
-                robot_joints, robot_ee = self.skeleton["right"]["ub_xsens"].ub_fkine(self.xsens_response["right"]["list"])
-            
-            for i in range(NUM_RFT):
-                # add back the initial removed sensor base bias and remove the subsequent installation bias obtained from the logger
-                cur_removed_bias = np.array(self.removed_bias[rft_key[i]])
-                force_data = np.array(corc_data[1+i*6:1+i*6+6])+cur_removed_bias-self.init_bias[i*6:i*6+6]-self.bias_response[i*6:i*6+6]
-                
-                # weight compensate with if robot_ee exist
-                if hasattr(self, 'xsens_response'):
-                    pose = robot_ee[i + 1]
-                    weight_comp = [x * self.ft_grav[rft_key[i]] for x in [0,0,-1]]
-                    force_data = force_data - np.array(list(np.matmul(pose.R.T, np.array(weight_comp))) + [0,0,0])
-
-                txt += f"UBO_{i} Force(N): {force_data[0]:8.4f} {force_data[1]:8.4f} {force_data[2]:8.4f} | Moment(Nm): {force_data[3]:8.4f} {force_data[4]:8.4f} {force_data[5]:8.4f}\n"
-                txt += f"Force Mag{np.linalg.norm(force_data[:3]):8.4f} N | Moment Mag:{np.linalg.norm(force_data[3:]):8.4f} Nm\n"
-
-                if self.gui_args["on"] and self.gui_args["force"]:
-                    self.update_live_stream_plot(self.ubo_wrenches_live_stream,self.ubo_F_live_stream_plots[i],force_data,dim=3)
-                    self.update_live_stream_plot(self.ubo_wrenches_live_stream,self.ubo_M_live_stream_plots[i],force_data[3:],dim=3)
-            self.update_response_label(self.corc_label,f"FPS:{fps}\nCORC Running Time:{corc_data[0]}s\n{txt}")
-
-        if hasattr(self, 'xsens_response'):
-            # update rft info
-            timecode = self.xsens_response["timecode"]
-            fps = self.xsens_response["xsens_fps"]
-            right_list = self.xsens_response["right"]["list"]
-            left_list = self.xsens_response["left"]["list"]
-
-            txt = f"XSENS Timecode:{timecode}\n"
-
-            for i,key in  enumerate(['trunk_ie','trunk_aa','trunk_fe',
-                        'clav_dep_ev','clav_prot_ret',
-                        'shoulder_fe','shoulder_aa','shoulder_ie',
-                        'elbow_fe','elbow_ps','wrist_fe','wrist_dev']):
-                txt += f"{key:15}: {left_list[i]:8.4f} {right_list[i]:8.4f}\n"
-            self.update_response_label(self.xsens_label,f"FPS:{fps}\n{txt}")
-
-            if self.gui_args["on"] and self.gui_args["3d"]:
-                for side in ["right","left"]:
-                    robot_joints, robot_ee = self.skeleton[side]["ub_xsens"].ub_fkine(self.xsens_response[side]["list"])                        
-                    self.update_line(self.skeleton[side]["body"],points=robot_joints.t)
+        for topic in self.workers:
+            if topic in self.responses: # check if key exists
+                if topic == "corc":
+                    # update rft info
+                    corc_data = self.responses[topic]["raw_data"]
+                    fps = self.responses[topic]["fps"]
+                    txt = ""
+        
+                    # get the orientation of the sensors if exist:
+                    if "xsens" in self.responses:
+                        robot_joints, robot_ee = self.skeleton["right"]["ub_xsens"].ub_fkine(self.responses["xsens"]["right"]["list"])
                     
-                    for i,(frame,force,pose) in enumerate(zip(self.skeleton[side]["ees"],self.skeleton[side]["forces"],robot_ee)):
-                        self.update_frame(frame,pos=pose.t,rot=pose.R*0.1)
-                        if i != 0 and side == "right" and hasattr(self, 'corc_response'):
-                            j = i - 1
-                            # add back the initial removed sensor base bias and remove the subsequent installation bias obtained from the logger
-                            net_bias = np.array(self.removed_bias[rft_key[j]])-self.bias_response[j*6:j*6+6]-self.init_bias[j*6:j*6+6]
-                            force_data = np.array(corc_data[1+j*6:1+j*6+6])+np.array(net_bias)
-
-                            weight_comp = [x * self.ft_grav[rft_key[j]] for x in [0,0,-1]]
+                    for i in range(NUM_RFT):
+                        # add back the initial removed sensor base bias and remove the subsequent installation bias obtained from the logger
+                        cur_removed_bias = np.array(self.removed_bias[rft_key[i]])
+                        force_data = np.array(corc_data[1+i*6:1+i*6+6])+cur_removed_bias-self.init_bias[i*6:i*6+6]-self.bias_response[i*6:i*6+6]
+                        
+                        # weight compensate with if robot_ee exist
+                        if "xsens" in self.responses:
+                            pose = robot_ee[i + 1]
+                            weight_comp = [x * self.ft_grav[rft_key[i]] for x in [0,0,-1]]
                             force_data = force_data - np.array(list(np.matmul(pose.R.T, np.array(weight_comp))) + [0,0,0])
-                            self.update_line(force,points=np.vstack([pose.t, pose.t + np.matmul(pose.R,force_data[:3])*0.02]))
-        if hasattr(self, 'logger_response'):
-            print_text = self.logger_response["print_text"]
-            fps = self.logger_response["logger_fps"]
-            self.update_response_label(self.logger_label,f"{print_text}")
-    
+        
+                        txt += f"UBO_{i} Force(N): {force_data[0]:8.4f} {force_data[1]:8.4f} {force_data[2]:8.4f} | Moment(Nm): {force_data[3]:8.4f} {force_data[4]:8.4f} {force_data[5]:8.4f}\n"
+                        txt += f"Force Mag{np.linalg.norm(force_data[:3]):8.4f} N | Moment Mag:{np.linalg.norm(force_data[3:]):8.4f} Nm\n"
+        
+                        if self.gui_args["on"] and self.gui_args["force"]:
+                            self.update_live_stream_plot(self.ubo_wrenches_live_stream,self.ubo_F_live_stream_plots[i],force_data,dim=3)
+                            self.update_live_stream_plot(self.ubo_wrenches_live_stream,self.ubo_M_live_stream_plots[i],force_data[3:],dim=3)
+                    self.update_response_label(self.labels[topic],f"FPS:{fps}\nCORC Running Time:{corc_data[0]}s\n{txt}")
+        
+                elif topic == "xsens":
+                    # update rft info
+                    timecode = self.responses[topic]["timecode"]
+                    fps = self.responses[topic]["fps"]
+                    right_list = self.responses[topic]["right"]["list"]
+                    left_list = self.responses[topic]["left"]["list"]
+        
+                    txt = f"XSENS Timecode:{timecode}\n"
+        
+                    for i,key in  enumerate(['trunk_ie','trunk_aa','trunk_fe',
+                                'clav_dep_ev','clav_prot_ret',
+                                'shoulder_fe','shoulder_aa','shoulder_ie',
+                                'elbow_fe','elbow_ps','wrist_fe','wrist_dev']):
+                        txt += f"{key:15}: {left_list[i]:8.4f} {right_list[i]:8.4f}\n"
+                    self.update_response_label(self.labels[topic],f"FPS:{fps}\n{txt}")
+        
+                    if self.gui_args["on"] and self.gui_args["3d"]:
+                        for side in ["right","left"]:
+                            robot_joints, robot_ee = self.skeleton[side]["ub_xsens"].ub_fkine(self.responses[topic][side]["list"])                        
+                            self.update_line(self.skeleton[side]["body"],points=robot_joints.t)
+                            
+                            for i,(frame,force,pose) in enumerate(zip(self.skeleton[side]["ees"],self.skeleton[side]["forces"],robot_ee)):
+                                self.update_frame(frame,pos=pose.t,rot=pose.R*0.1)
+                                if i != 0 and side == "right" and "corc" in self.responses:
+                                    j = i - 1
+                                    # add back the initial removed sensor base bias and remove the subsequent installation bias obtained from the logger
+                                    net_bias = np.array(self.removed_bias[rft_key[j]])-self.bias_response[j*6:j*6+6]-self.init_bias[j*6:j*6+6]
+                                    force_data = np.array(corc_data[1+j*6:1+j*6+6])+np.array(net_bias)
+        
+                                    weight_comp = [x * self.ft_grav[rft_key[j]] for x in [0,0,-1]]
+                                    force_data = force_data - np.array(list(np.matmul(pose.R.T, np.array(weight_comp))) + [0,0,0])
+                                    self.update_line(force,points=np.vstack([pose.t, pose.t + np.matmul(pose.R,force_data[:3])*0.02]))
+                elif topic == "logger":
+                    print_text = self.responses[topic]["print_text"]
+                    fps = self.responses[topic]["fps"]
+                    self.update_response_label(self.labels[topic],f"{print_text}\nFPS:{fps}")
     """
     Cleanup
     """
     def close_worker_thread(self,worker):
         QMetaObject.invokeMethod(worker, "stop", Qt.ConnectionType.QueuedConnection)
     def close_workers(self):
-        if hasattr(self, 'corc_response'):
-            self.close_worker_thread(self.corc_worker)
-        if hasattr(self, 'xsens_response'):
-            self.close_worker_thread(self.xsens_worker)
-        if hasattr(self, 'logger_response'):
-            self.close_worker_thread(self.logger_worker)
+        for topic in self.workers:
+            self.close_worker_thread(self.workers[topic])
     @Slot()
     def close_app(self):
         self.num_closed_threads += 1

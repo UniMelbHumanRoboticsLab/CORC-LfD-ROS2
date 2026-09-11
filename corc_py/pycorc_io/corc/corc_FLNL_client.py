@@ -158,19 +158,22 @@ class corc_FLNL_client(QObject):
             self.get_latest()
             if(self.newValsRcv and len(self.ValsRcv)>0):
                 data = {
+                    "topic":"corc",
                     "raw_data":self.ValsRcv,
-                    "corc_fps":self.corc_fps,
+                    "fps":self.corc_fps,
                 }
             else:
                 data = {
+                    "topic":"corc",
                     "raw_data":self.error,
-                    "corc_fps":self.corc_fps,
+                    "fps":self.corc_fps,
                 }
             self.data_ready.emit(data)
-        except Exception as e:
+        except Exception:
             data = {
+                "topic":"corc",
+                "fps":self.corc_fps,
                 "raw_data":self.error,
-                "corc_fps":self.corc_fps,
             }
             self.data_ready.emit(data)
     """

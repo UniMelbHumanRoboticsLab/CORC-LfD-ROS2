@@ -19,7 +19,111 @@ def unitV(vec):
     return vec/np.linalg.norm(vec)
 
 ############### All Available Upper Limb Models ##############################
-def xsens_ub_12dof(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: float = 0, m_fa: float = 0,shoulder_aa_offset:float = 16, arm_side:str = "right") -> rbt.Robot:
+def xsens_ub_ros_12dof(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: float = 0, m_fa: float = 0,shoulder_aa_offset:float = 16, elbow_ps_offset=np.pi/2,arm_side:str = "right") -> rbt.Robot:
+    """
+    xsens_ub_12dof Create a Robot of robotic toolbox Xsens compatible upper body (pelvis to hand)
+    torso: torso length
+    clav: clavicle length
+    ua_l: upper-arm length
+    fa_l: forearm length
+    ha_l: hand length
+    m_ua and m_fa: upper-arm and forearm masses, centered in middle of segment
+    - internal/external rotation are not following ISBUL standard for rehabilitation application
+    """
+
+    if arm_side == "right":
+        L = [] #Links list
+        # ROM: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7549223/#:~:text=Normal%20range%20of%20active%20movement,for%20external%20rotation%20%5B6%5D.
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=0,offset=np.pi/2,name='trunk_ie'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=np.pi/2,name='trunk_aa'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=0,name='trunk_fe'))
+        L.append(rbt.RevoluteMDH(d=0,a=torso,alpha=np.pi/2,offset=np.pi/2,name='clav_dep_ev')) 
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=-np.pi/2,name='clav_prot_ret'))
+        L.append(rbt.RevoluteMDH(d=clav,a=0,alpha=np.pi/2,offset=-np.pi/2,name='shoulder_fe'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=-np.pi/2-np.deg2rad(shoulder_aa_offset[0]),name='shoulder_aa'))
+        L.append(rbt.RevoluteMDH(d=-ua_l,a=0,alpha=np.pi/2,offset=-np.pi/2,name='shoulder_ie'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=np.pi,name='elbow_fe'))
+        L.append(rbt.RevoluteMDH(d=-fa_l,a=0,alpha=np.pi/2,offset=np.pi/2,name='elbow_ps',qlim=[-45,190]))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=-np.pi/2,offset=-np.pi/2,name='wrist_fe'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=-np.pi/2,offset=-np.pi/2,name='wrist_dev'))
+
+        xsens = rbt.DHRobot(L,name="ub")
+        xsens.base=SE3([-0.5,-0.5,-0.5]) * SE3(SO3.Rz(np.pi/2))
+        
+        #Add hand transformation (tool) to match XSENS model wrist offset
+        xsens.tool= SE3([0,-ha_l,0]) * SE3(SO3.Rx(np.pi))#*SE3(SO3.Rx(0)) # for intrinsic rotation (rotation about local axis), always use post multiply
+    elif arm_side == "left":
+        L = [] #Links list
+        # ROM: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7549223/#:~:text=Normal%20range%20of%20active%20movement,for%20external%20rotation%20%5B6%5D.
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=0,offset=np.pi/2,name='trunk_ie'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=np.pi/2,name='trunk_aa'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=np.pi,name='trunk_fe'))
+        L.append(rbt.RevoluteMDH(d=0,a=-torso,alpha=np.pi/2,offset=np.pi/2,name='clav_dep_ev'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=-np.pi/2,name='clav_prot_ret'))
+        L.append(rbt.RevoluteMDH(d=-clav,a=0,alpha=np.pi/2,offset=-np.pi/2,name='shoulder_fe'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=-np.pi/2-np.deg2rad(shoulder_aa_offset[1]),name='shoulder_aa'))
+        L.append(rbt.RevoluteMDH(d=ua_l,a=0,alpha=np.pi/2,offset=-np.pi/2,name='shoulder_ie'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=np.pi,name='elbow_fe'))
+        L.append(rbt.RevoluteMDH(d=fa_l,a=0,alpha=np.pi/2,offset=np.pi/2,name='elbow_ps'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=-np.pi/2,offset=-np.pi/2,name='wrist_fe'))
+        L.append(rbt.RevoluteMDH(d=0,a=0,alpha=-np.pi/2,offset=np.pi/2,name='wrist_dev'))
+
+        xsens = rbt.DHRobot(L)
+
+        # #Add hand transformation (tool) to match XSENS model wrist offset
+        xsens.base=SE3([-0.5,-0.5,-0.5]) * SE3(SO3.Rz(np.pi/2))
+        xsens.tool=SE3([0,-ha_l,0])* SE3(SO3.Rz(np.pi))#*SE3(SO3.Rx(0))* # for intrinsic rotation (rotation about local axis), always use post multiply
+    return xsens
+def emu(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: float = 0, m_fa: float = 0,ft_offsets: dict = {}, shoulder_aa_offset:np.array = np.array([0,0]), arm_side:str = "right") -> rbt.Robot:
+    """
+    emu: xsens_upper_body_model + 1 RFT sensor at the wrist
+    torso: torso length
+    clav: clavicle length
+    ua_l: upper-arm length
+    fa_l: forearm length
+    ha_l: hand length
+    m_ua and m_fa: upper-arm and forearm masses, centered in middle of segment
+    - internal/external rotation are not following ISBUL standard for rehabilitation application
+    """
+    rbts = []
+
+    """
+    Upper Body
+    """
+    ub = xsens_ub_ros_12dof(torso,clav,ua_l,fa_l,ha_l,m_ua,m_fa,shoulder_aa_offset,np.pi/2,arm_side)
+    rbts.append(ub)
+
+    """
+    RFTs
+    """
+    if arm_side == "right":
+        """ 
+        FA RFT
+        """
+        fa_link = [] #Links list
+        fa_offsets = np.array(ft_offsets["fa"])/1000
+        # ROM: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7549223/#:~:text=Normal%20range%20of%20active%20movement,for%20external%20rotation%20%5B6%5D.
+        
+        fa_link.append(rbt.RevoluteMDH(d=0,a=0,alpha=0,offset=np.pi/2,name='trunk_ie'))
+        fa_link.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=np.pi/2,name='trunk_aa'))
+        fa_link.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=0,name='trunk_fe'))
+        fa_link.append(rbt.RevoluteMDH(d=0,a=torso,alpha=np.pi/2,offset=np.pi/2,name='clav_dep_ev'))
+        fa_link.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=-np.pi/2,name='clav_prot_ret'))
+        fa_link.append(rbt.RevoluteMDH(d=clav,a=0,alpha=np.pi/2,offset=-np.pi/2,name='shoulder_fe'))
+        fa_link.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=-np.pi/2-np.deg2rad(shoulder_aa_offset[0]),name='shoulder_aa'))
+        fa_link.append(rbt.RevoluteMDH(d=-ua_l,a=0,alpha=np.pi/2,offset=-np.pi/2,name='shoulder_ie'))
+        fa_link.append(rbt.RevoluteMDH(d=0,a=0,alpha=np.pi/2,offset=np.pi,name='elbow_fe'))
+        fa_link.append(rbt.RevoluteMDH(d=-fa_offsets[1],a=0,alpha=np.pi/2,offset=np.pi/2,name='elbow_ps'))
+
+        fa_rbt = rbt.DHRobot(fa_link,name="fa")
+        fa_rbt.base= SE3([-0.5,-0.5,-0.5]) * SE3(SO3.Rz(np.pi/2))
+        
+        #Add hand transformation (tool) to match rft
+        fa_rbt.tool= SE3([0,-fa_offsets[0],0]) * SE3(SO3.Rx(-np.pi/2)) * SE3(SO3.Rz(-np.pi/2)) #* SE3(SO3.Rx(0)) # for intrinsic rotation (rotation about local axis), always use post multiply
+
+        rbts.append(fa_rbt)
+    return rbts
+def xsens_ub_12dof(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: float = 0, m_fa: float = 0,shoulder_aa_offset:float = 16,arm_side:str = "right") -> rbt.Robot:
     """
     xsens_ub_12dof Create a Robot of robotic toolbox Xsens compatible upper body (pelvis to hand)
     torso: torso length
@@ -74,9 +178,7 @@ def xsens_ub_12dof(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float,
         xsens.base=SE3(SO3.Rz(np.pi/2))
         xsens.tool=SE3([0,-ha_l,0])* SE3(SO3.Rz(np.pi))#*SE3(SO3.Rx(0))* # for intrinsic rotation (rotation about local axis), always use post multiply
     return xsens
-
-
-def ubo_robot(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: float = 0, m_fa: float = 0,ft_offsets: dict = {}, shoulder_aa_offset:np.array = np.array([0,0]), arm_side:str = "right") -> rbt.Robot:
+def ubo(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: float = 0, m_fa: float = 0,ft_offsets: dict = {}, shoulder_aa_offset:np.array = np.array([0,0]), arm_side:str = "right") -> rbt.Robot:
     """
     ubo_robot xsens_upper_body_model + the 3 RFT sensors
     torso: torso length
