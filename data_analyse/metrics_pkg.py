@@ -1,5 +1,8 @@
+import sys, os
+sys.path.append(os.path.join(os.path.dirname(__file__)))
+
 import numpy as np
-from scipy import integrate
+from scipy import integrate,signal
 from dtaidistance import dtw_ndim,dtw
 from stats_pkg import compute_central_tendency,remove_outliers_iqr,compute_CI_scale
 
@@ -7,7 +10,16 @@ q = ['trunk_ie','trunk_aa','trunk_fe',
 	'clav_dep_ev','clav_prot_ret',
 	'shoulder_fe','shoulder_aa','shoulder_ie',
 	'elbow_fe','elbow_ps']
+
+def compute_cross_correlate(arrA,arrB):
+    corr = signal.correlate(arrA, arrB,'same')
+    lags = signal.correlation_lags(len(arrA), len(arrB),'same')
+    corr /= np.max(corr)
+    corr = np.linalg.norm(corr, axis=1)
+    max_lag = lags[np.argmax(corr)]
     
+    return lags, corr,max_lag
+
 def compute_norm_error(recon,comparator):
     # normalise using mid, min and max range
     max_med_range = comparator["max"]-comparator["mid"]

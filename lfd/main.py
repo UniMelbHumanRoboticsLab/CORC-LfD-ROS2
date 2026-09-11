@@ -16,7 +16,7 @@ from data_analyse.stats_pkg import compute_central_tendency
 import matplotlib.pyplot as plt
 
 plt_results = True
-retrain = False
+retrain = True
 # retrain = True
 deploy = True
 
@@ -26,7 +26,7 @@ RED = '\033[91m'
 RESET = '\033[0m'
 
 p_start = 1
-sub_start  = 11
+sub_start  = 18
 
 total_monte = 4
 
@@ -35,17 +35,21 @@ total_monte = 4
 # 4 train var - 6 combinations (prev), 7 (current)
 # 5 train var - 6 combinations
 
-for train_var_num,total_combi in zip([2,3],[2,10]):
+for train_var_num,total_combi in zip([4],[7]):
     for p in range(p_start,4):
         total_time = 0
-            
+        if p == 1:
+            sm_num = 2
+        else:
+            sm_num=4
         for sub in range(sub_start,25):
             session_data = {
-                "exp_id":f"exp1_trained_{train_var_num}",
+                "exp_id":f"exp1_tnsre_trained{train_var_num}",
                 "patient_id":f"p{p}",
                 "subject_id":f"sub{sub}",
                 "num_rep":4,
-                "variants":["var_1","var_2","var_3","var_4","var_5","var_6"] #
+                "variants":["var_1","var_2","var_3","var_4","var_5","var_6"] ,
+                "sbmvmt_num":sm_num
             }
             subject_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
             
@@ -77,7 +81,7 @@ for train_var_num,total_combi in zip([2,3],[2,10]):
                     tpgmm_file_path = f'{subject_path}/repro/tpgmm_{combi_num}_{sample_num}.pkl'
                     exist = os.path.exists(tpgmm_file_path)
 
-                    if exist:
+                    if exist and not retrain:
                         with open(tpgmm_file_path, 'rb') as outp:                        
                             tpgmm = pickle.load(outp)
                         print(type(tpgmm))
@@ -209,7 +213,7 @@ for train_var_num,total_combi in zip([2,3],[2,10]):
                             id_list.append(val_dict["id"])
                             time_list.append(val_dict["time"])
                     
-                            expected_data,exp_sigma,_,_ = tpgmm.repro_condition_gmr(DataIn,sample,lastInputIndex,lastOutputIndex,DS=False,new_dt=0)
+                            expected_data,exp_sigma,_,_ = tpgmm.condition_repro_gmr(DataIn,sample,lastInputIndex,lastOutputIndex,DS=False,new_dt=0)
                             recon_list.append(expected_data)
                             
                             lut_output = lut.search_closest_output(val_dict["time"],DataIn)
@@ -296,7 +300,7 @@ for train_var_num,total_combi in zip([2,3],[2,10]):
                             var_id_list.append(sample_id[0])
                             time_list.append(test_dict["time"])
                             
-                            expected_data,exp_sigma,_,_ = tpgmm.repro_condition_gmr(DataIn,sample,lastInputIndex,lastOutputIndex,DS=False,new_dt=0)
+                            expected_data,exp_sigma,_,_ = tpgmm.condition_repro_gmr(DataIn,sample,lastInputIndex,lastOutputIndex,DS=False,new_dt=0)
                             recon_list.append(expected_data)
                             
                             lut_output = lut.search_closest_output(test_dict["time"],DataIn)

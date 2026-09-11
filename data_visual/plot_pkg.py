@@ -58,7 +58,7 @@ def get_n_colors(n_colors: int, split=4, color_set="Set1", shuffle=None):
     import seaborn as sns
 
     # Determine how many base colors we need
-    if n_colors > 0 and n_colors % split == 0 and n_colors // split > 1:
+    if n_colors > 0 and n_colors % split == 0 and n_colors // split >= 1:
         base_count = n_colors // split
     else:
         base_count = n_colors
@@ -73,9 +73,9 @@ def get_n_colors(n_colors: int, split=4, color_set="Set1", shuffle=None):
         palette = palette[::-1]
         
     palette = palette[0:base_count]
-    print(palette[0])
+    # print(palette[0])
     # Repeat each base color `split` times when applicable
-    if n_colors > 0 and n_colors % split == 0 and n_colors // split > 1:
+    if n_colors > 0 and n_colors % split == 0 and n_colors // split >= 1:
         colors = [c for c in palette for _ in range(split)]
     else:
         colors = palette
@@ -86,12 +86,12 @@ def get_n_colors(n_colors: int, split=4, color_set="Set1", shuffle=None):
 #================2D DATA VISUALIZATION===============================
 """plot each axis as 1 dimension from multiple sources"""
 def plot_multi_dim(x_list:list,data_list:list,
-                           dim:int,labels:list,xtype:str,datatype:str,
-                           split=4,color_set="Set1",shuffle=False,
-                           sharex:bool=True,semilogx:bool=False,legend:bool=True,
-                           fig_label:str="Take1",
-                           show_stats:bool=False,show_zero_cross:bool=False,
-                           prev_fig=None,prev_ax=None,loc="+2000+100",figsize=(8,5)):
+                    dim:int,labels:list,xtype:str,datatype:str,
+                    split=4,color_set="Set1",shuffle=False,
+                    sharex:bool=True,semilogx:bool=False,legend:bool=True,
+                    fig_label:str="Take1",
+                    show_stats:bool=False,show_zero_cross:bool=False,
+                    prev_fig=None,prev_ax=None,loc="+2000+100",figsize=(8,5)):
     
     if "rad" in datatype:
         temp = [np.rad2deg(data) for data in data_list]
@@ -104,7 +104,22 @@ def plot_multi_dim(x_list:list,data_list:list,
         axs = prev_ax
     else:
         fig = plt.figure(figsize=figsize,num=fig_label,layout="constrained")
-        fig.canvas.manager.window.wm_geometry(loc)
+        mgr = fig.canvas.manager
+        win = mgr.window
+        # parse loc
+        if isinstance(loc, str):
+            x, y = map(int, loc.strip("+").split("+"))
+        else:
+            x, y = loc
+        
+        # Tk backend window
+        if hasattr(win, "wm_geometry"):
+            win.wm_geometry(f"+{x}+{y}")
+        
+        # Qt backend window
+        elif hasattr(win, "move"):
+            win.move(x, y)
+
         axs = []
     
         # adjust the dimension labels for specific dimensions
@@ -616,7 +631,22 @@ def create_custom_3d_fig(num="Hand Traj"):
 
     fig.canvas.mpl_connect("scroll_event", on_scroll)
     
-    fig.canvas.manager.window.wm_geometry("+2900+100")
+    loc = "+2900+100"
+    mgr = fig.canvas.manager
+    win = mgr.window
+    # parse loc
+    if isinstance(loc, str):
+        x, y = map(int, loc.strip("+").split("+"))
+    else:
+        x, y = loc
+    
+    # Tk backend window
+    if hasattr(win, "wm_geometry"):
+        win.wm_geometry(f"+{x}+{y}")
+    
+    # Qt backend window
+    elif hasattr(win, "move"):
+        win.move(x, y)
     
     mpl.rcParams['axes3d.mouserotationstyle'] = "azel"
     return fig,ax

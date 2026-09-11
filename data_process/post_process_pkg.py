@@ -8,7 +8,91 @@ from data_visual.plot_pkg import plot_multi_dim,plot_3d_submovements
 from scipy.interpolate import CubicSpline
 
 from dtaidistance import dtw_ndim,dtw
+import math
+from scipy.signal import butter,bessel, sosfilt_zi, sosfilt
 
+class JointVelEstimatorND:
+    def __init__(self, dim, fs=62.5, fc=10):
+        self.dim = dim
+        self.b, self.a = butter(N=2, Wn=fc, btype='low', fs=fs)
+        print(f"Order 2 butterworth initialised: b:{self.b} a:{self.a}")
+        # self.sos = bessel(2, fc, btype='low', fs=fs, output='sos')
+        # n_sections = self.sos.shape[0]
+        # self.zi = np.zeros((12, n_sections, 2), dtype=float)
+        # print(f"Order 2 bessel initialised: sos:{self.sos}")
+        
+
+        self.prev_t = None
+        self.prev_q = None  # np.array shape (dim,)
+
+        self.x1 = np.zeros(dim)
+        self.x2 = np.zeros(dim)
+        self.y1 = np.zeros(dim)
+        self.y2 = np.zeros(dim)
+    
+    def reset_filter(self):
+        self.prev_t = None
+        self.prev_q = None  # np.array shape (dim,)
+
+        self.x1 = np.zeros(self.dim)
+        self.x2 = np.zeros(self.dim)
+        self.y1 = np.zeros(self.dim)
+        self.y2 = np.zeros(self.dim)
+    
+    # def update(self,timestamp,q):
+    #     q = np.asarray(q, dtype=float)
+    #     if self.prev_t is None:
+    #         self.prev_t = timestamp
+    #         self.prev_q = q.copy()
+    #         return np.zeros(self.dim)
+        
+    #     y = np.empty(12, dtype=float)
+    #     new_zi = np.empty_like(self.zi)
+        
+    #     dt = timestamp - self.prev_t
+    #     if dt <= 0:
+    #         return self.y1.copy()
+
+    #     # element-wise raw velocity
+    #     qd = (q - self.prev_q) / dt
+    #     for d in range(12):
+    #         yd, new_zi[d] = sosfilt(self.sos, [qd[d]], zi=self.zi[d])
+    #         y[d] = yd[0]
+    #     self.zi = new_zi
+        
+    #     self.prev_t = timestamp
+    #     self.prev_q = q.copy()
+    #     return y
+        
+    def update(self, timestamp, q):
+        q = np.asarray(q, dtype=float)
+        if q.shape != (self.dim,):
+            raise ValueError(f"Expected q shape ({self.dim},), got {q.shape}")
+
+        if self.prev_t is None:
+            self.prev_t = timestamp
+            self.prev_q = q.copy()
+            return np.zeros(self.dim)
+
+        dt = timestamp - self.prev_t
+        if dt <= 0:
+            return self.y1.copy()
+
+        # element-wise raw velocity
+        x0 = (q - self.prev_q) / dt
+
+        b0, b1, b2 = self.b
+        _, a1, a2 = self.a
+        y0 = b0*x0 + b1*self.x1 + b2*self.x2 - a1*self.y1 - a2*self.y2
+
+        self.x2, self.x1 = self.x1.copy(), x0.copy()
+        self.y2, self.y1 = self.y1.copy(), y0.copy()
+
+        self.prev_t = timestamp
+        self.prev_q = q.copy()
+
+        return y0
+    
 """low pass filter"""
 def lpf(time_array,data,ts=0.01,fc=50,filter_type="low",datatype="trajectory",plot_results=False):
     from scipy.fft import fft,fftfreq
@@ -154,11 +238,11 @@ def segment_sbmvmts(time_array,hand_traj,hand_speed,submovement_num,data_path,re
             sbmvmt_indices = new_sbmvmt_indices
             time_array_norm = (time_array-time_array[0])/(time_array[-1]-time_array[0])
         if redo:
-            placehold = sg.popup('',location=(1550,300),non_blocking=True)  
+            # placehold = sg.popup('',location=(1550,300),non_blocking=True)  
             plot_3d_submovements(hand_traj,sbmvmt_indices=sbmvmt_indices,skeleton=skeleton)
             plt.show(block=False)
             ok_or_not = sg.popup_yes_no('Ok or not',location=(3400,300),non_blocking=False)  
-            placehold.close()
+            # placehold.close()
             plt.close("all")
             if ok_or_not == "Yes":
                 good = True
@@ -174,7 +258,7 @@ def segment_sbmvmts(time_array,hand_traj,hand_speed,submovement_num,data_path,re
         
     while not good:
         from mpl_point_clicker import clicker
-        placehold = sg.popup('',location=(1550,300),non_blocking=True)  
+        placehold = sg.popup('',location=(1550,300),non_blocking=True)  # remember to FSG change source code to return window for non-blocking = True popups
         plot_3d_submovements(hand_traj,sbmvmt_indices=sbmvmt_indices,skeleton=skeleton)
         fig,axs = plot_multi_dim([time_array], [hand_speed], 1, ['speed'], 'Time', 'Hand Speed',fig_label= data_path)
         klicker = clicker(axs[0], ["event"], markers=["x"])
@@ -236,11 +320,9 @@ def segment_sbmvmts(time_array,hand_traj,hand_speed,submovement_num,data_path,re
         else:
             print(f"{segment_type} Indices:", sbmvmt_indices)
             print(f"Selected {segment_type} Time:",np.array(time_array[sbmvmt_indices],dtype=float))
-            placehold = sg.popup('',location=(3400,300),non_blocking=True)  
             plot_3d_submovements(hand_traj,sbmvmt_indices=sbmvmt_indices,skeleton=skeleton)
             plt.show(block=False)
             ok_or_not = sg.popup_yes_no('Ok or not',location=(3400,300),non_blocking=False)  
-            placehold.close()
             plt.close("all")
             if ok_or_not == "Yes":
                 good = True

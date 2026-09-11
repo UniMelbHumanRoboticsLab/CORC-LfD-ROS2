@@ -45,7 +45,7 @@ for p in range(p_start,4):
         # delete existing splits 
         [file.unlink() for file in Path(f'{subject_path}/splits').iterdir() if file.is_file()] 
         create_dir(f'{subject_path}/splits')
-        separate_train_test_val(session_data["variants"],f'{subject_path}',num_train=5)
+        separate_train_test_val(session_data["variants"],f'{subject_path}',num_train=4)
         # assert 0
         """ init xsens skeleton model """
         body_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/subject_measurements/{session_data["subject_id"]}')
@@ -73,7 +73,7 @@ for p in range(p_start,4):
         fc = 10  # cut-off frequency
         fs = 100 # resample frequency
         dt = 1/fs
-        reprocess = False
+        reprocess = True
         plot_sub = False
         for var in session_data["variants"]:
             full_data_dict[var] = {}
@@ -155,7 +155,7 @@ for p in range(p_start,4):
                     """ Filter """
                     # filter the original data
                     filter = "bp"
-                    plot_results = True # check if filter fucks up the data
+                    plot_results = False # check if filter fucks up the data
                     corc_data   = lpf(time_data_unscaled,corc_data_unscaled,ts=dt_unscaled,fc=fc,filter_type="low",datatype=f"wrenches_{var}-Rep{rep}",   plot_results=plot_results)
                     q_traj      = lpf(time_data_unscaled,q_traj_unscaled,   ts=dt_unscaled,fc=fc,datatype=f"q_{var}-Rep{rep}",          plot_results=plot_results)
                     # calculate joint space kinematic and filter
@@ -171,7 +171,6 @@ for p in range(p_start,4):
                     for rft_key in rft_keys:
                         taus_traj[rft_key]["filtered"] = lpf(time_data_unscaled,taus_traj[rft_key]["raw"],ts=dt_unscaled,fc=fc,datatype=f"tau_{rft_key}_{var}-Rep{rep}",plot_results=False)
                     taus_traj["total"]["filtered"] = lpf(time_data_unscaled,taus_traj["total"]["raw"],ts=dt_unscaled,fc=fc,datatype=f"tau_total_{var}-Rep{rep}",plot_results=plot_results)
-                    
                     
                     """ Uniform Resampling """
                     # downsample for easier model learning
@@ -225,45 +224,45 @@ for p in range(p_start,4):
                     
                     align_dim = 20
                     paths = align_dtw(reference_interaction[:,0:align_dim],target_interaction[:,0:align_dim])
-                    placehold = sg.popup('',location=(1550,300),non_blocking=True)  
-                    f1,a1 = plot_multi_dim(
-                            [time_data,ref_time_data,ref_time_data],
-                            [q_traj_rad,warp_target_to_ref(reference_interaction,q_traj_rad,paths),reference_interaction[:,0:10]],
-                            10,
-                            ["ori","dtw","ref"],
-                            'Time(s)',
-                            "q_rad",
-                            sharex=True,
-                            semilogx=False,
-                            fig_label=f"joint angle rad {align_dim}",
-                            show_stats=False,loc="+2000+800")
-                    f2,a2 = plot_multi_dim(
-                            [time_data,ref_time_data,ref_time_data],
-                            [qdot_traj_rad,warp_target_to_ref(reference_interaction,qdot_traj_rad,paths),reference_interaction[:,10:20]],
-                            10,
-                            ["ori","dtw","ref"],
-                            'Time(s)',
-                            "qdot_rad",
-                            sharex=True,
-                            semilogx=False,
-                            fig_label=f"joint angle vel rad/s {align_dim}",
-                            show_stats=False,loc="+2900+800",
-                            show_zero_cross=True)
-                    f3,a3 = plot_multi_dim(
-                            [time_data,ref_time_data,ref_time_data],
-                            [taus_traj["total"]["filtered-rescaled"],warp_target_to_ref(reference_interaction,taus_traj["total"]["filtered-rescaled"],paths),reference_interaction[:,20:]],
-                            10,
-                            ["ori","dtw","ref"],
-                            'Time(s)',
-                            "tau",
-                            sharex=True,
-                            semilogx=False,
-                            fig_label=f"joint torque {align_dim}",
-                            show_stats=False,loc="+3800+800")
+                    # placehold = sg.popup('',location=(1550,300),non_blocking=True)  
+                    # f1,a1 = plot_multi_dim(
+                    #         [time_data,ref_time_data,ref_time_data],
+                    #         [q_traj_rad,warp_target_to_ref(reference_interaction,q_traj_rad,paths),reference_interaction[:,0:10]],
+                    #         10,
+                    #         ["ori","dtw","ref"],
+                    #         'Time(s)',
+                    #         "q_rad",
+                    #         sharex=True,
+                    #         semilogx=False,
+                    #         fig_label=f"joint angle rad {align_dim}",
+                    #         show_stats=False,loc="+2000+800")
+                    # f2,a2 = plot_multi_dim(
+                    #         [time_data,ref_time_data,ref_time_data],
+                    #         [qdot_traj_rad,warp_target_to_ref(reference_interaction,qdot_traj_rad,paths),reference_interaction[:,10:20]],
+                    #         10,
+                    #         ["ori","dtw","ref"],
+                    #         'Time(s)',
+                    #         "qdot_rad",
+                    #         sharex=True,
+                    #         semilogx=False,
+                    #         fig_label=f"joint angle vel rad/s {align_dim}",
+                    #         show_stats=False,loc="+2900+800",
+                    #         show_zero_cross=True)
+                    # f3,a3 = plot_multi_dim(
+                    #         [time_data,ref_time_data,ref_time_data],
+                    #         [taus_traj["total"]["filtered-rescaled"],warp_target_to_ref(reference_interaction,taus_traj["total"]["filtered-rescaled"],paths),reference_interaction[:,20:]],
+                    #         10,
+                    #         ["ori","dtw","ref"],
+                    #         'Time(s)',
+                    #         "tau",
+                    #         sharex=True,
+                    #         semilogx=False,
+                    #         fig_label=f"joint torque {align_dim}",
+                    #         show_stats=False,loc="+3800+800")
                     
-                    interactive_plot(f1,a1)
-                    interactive_plot(f2,a2)
-                    interactive_plot(f3,a3)
+                    # interactive_plot(f1,a1)
+                    # interactive_plot(f2,a2)
+                    # interactive_plot(f3,a3)
                     
                     """ Submovement Segment using unaligned movement"""
                     # segment rescaled but not aligned submovements

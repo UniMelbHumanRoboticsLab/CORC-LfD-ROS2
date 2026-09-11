@@ -2,63 +2,87 @@ import pandas as pd
 import numpy as np
 import os 
 
+""" compile raw data"""
+def get_raw_data_with_vel(data_path):
+    data = pd.read_csv(data_path)
+    time_data = data["time"].values
+    joints = ['trunk_ie','trunk_aa','trunk_fe',
+				'clav_dep_ev','clav_prot_ret',
+				'shoulder_fe','shoulder_aa','shoulder_ie',
+				'elbow_fe','elbow_ps',
+				'wrist_fe','wrist_dev']
+    q_right = data[[f"q_{joint}" for joint in joints]].values
+    qdot_right = data[[f"qdot_{joint}" for joint in joints]].values
+    
+    return data,time_data,q_right,qdot_right
+
 """ select which variation for train and for test """
+def level_sub(sample_id: int) -> tuple[int, int]:
+    """
+    Map an ID to (level, sublevel).
+
+    IDs:
+      1,2,3 -> level 1, sublevels 1,2,3
+      4,5,6 -> level 2, sublevels 1,2,3
+    """
+    level = 1 if sample_id <= 3 else 2
+    sub = ((sample_id - 1) % 3) + 1
+    return level, sub
+def valid_test_combis(n=6,num_train=5) -> list[tuple[int, int]]:
+    from itertools import combinations
+    ids = range(1, n + 1)
+    valid_tests = []
+    valid_trains = []
+    for combi in combinations(ids, num_train):
+        
+        selected_var = []
+        lvl_subs = []
+        for item in combi:
+            selected_var.append(item)
+            lvl_subs.append(level_sub(item))
+        # (first,second,third) = combi
+        # lvl_sublvl1 = level_sub(first)
+        # lvl_sublvl2 = level_sub(second)
+        # lvl_sublvl3 = level_sub(third)
+        
+        boundB = {1,3}
+        # B levels (sublevels) present in this combination
+        covered_subs = set()
+        # A levels (levels) counts in this triple
+        covered_levels = []
+        for lvl_sub in lvl_subs:
+            covered_subs.add(lvl_sub[1])
+            covered_levels.append(lvl_sub[0])
+                   
+        from collections import Counter
+        level_counts = Counter(covered_levels)
+        balance = num_train/2 if num_train%2 == 0 else (num_train+1)/2
+
+        if (boundB.issubset(covered_subs)) and max(level_counts.values()) <= balance: 
+            # covers endpoints b1,b3
+            # A levels is not dominant on 1 A level
+            # train conditions satisfy, take the rest as test variations
+            all_numbers = {1, 2, 3, 4, 5, 6}
+            remaining = all_numbers - set(combi)
+            valid_tests.append(list(remaining))
+            valid_trains.append(list(combi))
+            
+    # valid train combinations for each variation
+    var_train_combis = {}
+    for i in range(1,n+1):
+        var_train_combis[f"var_{i}"] = []
+        for combi in valid_trains:
+            if i not in combi:
+                var_train_combis[f"var_{i}"].append(combi)
+    return valid_tests,valid_trains,var_train_combis
 def separate_train_test_val(variant_list,path,num_train=5,num_val=1,num_monte=4):
     # Given numbers
     numbers = len(variant_list)
-    def level_sub(sample_id: int) -> tuple[int, int]:
-        """
-        Map an ID to (level, sublevel).
-    
-        IDs:
-          1,2,3 -> level 1, sublevels 1,2,3
-          4,5,6 -> level 2, sublevels 1,2,3
-        """
-        level = 1 if sample_id <= 3 else 2
-        sub = ((sample_id - 1) % 3) + 1
-        return level, sub
-    def valid_tri_combi(n=6) -> list[tuple[int, int]]:
-        from itertools import combinations
-        ids = range(1, n + 1)
-        out = []
-        for combi in combinations(ids, num_train):
-            
-            selected_var = []
-            lvl_subs = []
-            for item in combi:
-                selected_var.append(item)
-                lvl_subs.append(level_sub(item))
-            # (first,second,third) = combi
-            # lvl_sublvl1 = level_sub(first)
-            # lvl_sublvl2 = level_sub(second)
-            # lvl_sublvl3 = level_sub(third)
-            
-            boundB = {1,3}
-            # B levels (sublevels) present in this combination
-            covered_subs = set()
-            # A levels (levels) counts in this triple
-            covered_levels = []
-            for lvl_sub in lvl_subs:
-                covered_subs.add(lvl_sub[1])
-                covered_levels.append(lvl_sub[0])
-                       
-            from collections import Counter
-            level_counts = Counter(covered_levels)
-            balance = num_train/2 if num_train%2 == 0 else (num_train+1)/2
 
-            if (boundB.issubset(covered_subs)) and max(level_counts.values()) <= balance: 
-                # covers endpoints b1,b3
-                # A levels is not dominant on 1 A level
-                # train conditions satisfy, take the rest as test variations
-                all_numbers = {1, 2, 3, 4, 5, 6}
-                remaining = all_numbers - set(combi)
-                out.append(list(remaining))
-
-        return out
-    valid = valid_tri_combi(numbers)
+    valid_tests,valid_trains,_ = valid_test_combis(numbers,num_train)
         
     # iterate through every valid test combination
-    for i,test in enumerate(valid):
+    for i,test in enumerate(valid_tests):
         case_id = []
         train_var = []
         test_var = []
@@ -124,7 +148,6 @@ def separate_train_test_val(variant_list,path,num_train=5,num_val=1,num_monte=4)
                 print_text += f"{var}-Rep{rep}, "
             print(print_text,"\n")
 
-            
 """ compile raw data"""
 def get_raw_data(data_path):
     data = pd.read_csv(data_path)
