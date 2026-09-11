@@ -58,20 +58,27 @@ def get_optim_nbGauss(data):
             ["param_n_components", "param_covariance_type", "mean_test_score"]
         ]
         all_results_df = pd.concat([all_results_df, grid_search_df], ignore_index=True)
+        bic_change = np.abs((optim_mean_score-current_best_score)/current_best_score*100)
         
         # either optimal number of gaussian is far from the max limit or the score has converged
-        if optim_n_gauss < n_components or (optim_mean_score-current_best_score)/current_best_score*100 < 5:
-            print(f"\nPrevious best:{current_best_score:.4f}, Current best: {optim_mean_score:.4f}, BIC Change: {(optim_mean_score-current_best_score)/current_best_score*100 :.4f}")
+        if optim_n_gauss < n_components and bic_change < 5:
+            print(bic_change)
+            print(f"\nPrevious best:{current_best_score:.4f}, Current best: {optim_mean_score:.4f}, BIC Change: {bic_change :.4f}")
             print(f"Selected GMM (scaled): {grid_search.best_params_['covariance_type']} model, {optim_n_gauss} components")
             break
         else:
             n_components += 5
             print(f"\n{optim_n_gauss} is too close to the limit.")
-            print(f"Previous best:{current_best_score:.4f}, Current best: {optim_mean_score:.4f}, BIC Change: {(optim_mean_score-current_best_score)/current_best_score*100 :.4f}")
-            print(f"Optimizing from {optim_n_gauss-3} to {n_components}\n")
+            print(f"Previous best:{current_best_score:.4f}, Current best: {optim_mean_score:.4f}, BIC Change: {bic_change :.4f}")
+            if optim_n_gauss-3<=0:
+                optim_n_gauss = 1
+            else:
+                optim_n_gauss -=3
+            print(f"Optimizing from {optim_n_gauss} to {n_components}\n")
             current_best_score = optim_mean_score
+
             param_grid = {
-                "n_components": range(optim_n_gauss-3, n_components+1),
+                "n_components": range(optim_n_gauss, n_components+1),
                 "covariance_type": ["full"],
             }
 
@@ -98,12 +105,16 @@ def get_optim_nbGauss(data):
 """
 Function to transform / arrange data into samples / extract task parameters from each sample 
 """
-def transform_data(data,tp,num_of_frames,num_of_dim):
+def unpack_tp(tp,num_of_frames,num_of_dim):
     # extract every frame transformation for current sample
     A = np.array([tp[i,:(num_of_dim*num_of_dim)].reshape((num_of_dim,num_of_dim)).transpose() for i in range(num_of_frames)])
     invA = np.array([np.linalg.inv(A[i]) for i in range(num_of_frames)])
     b = np.array([tp[i,(num_of_dim*num_of_dim):].reshape((num_of_dim,1)) for i in range(num_of_frames)])
     paramsObj = TaskParams(A=A,b=b,invA=invA)
+    return paramsObj
+    
+def transform_data(data,tp,num_of_frames,num_of_dim):
+    paramsObj = unpack_tp(tp,num_of_frames,num_of_dim)
     
     # arrange the original trajectory referencing inertial frame
     if data is not None:
@@ -113,8 +124,8 @@ def transform_data(data,tp,num_of_frames,num_of_dim):
         tp_traj = np.empty((num_of_data_points,num_of_dim,num_of_frames))
         # task parameterize the current trajectory according to each frame
         for i in range(num_of_frames):
-            displaced = np.expand_dims(data-b[i].T,axis=2)
-            rotate = np.squeeze(np.matmul(invA[i],displaced),axis=2)
+            displaced = np.expand_dims(data-paramsObj.b[i].T,axis=2)
+            rotate = np.squeeze(np.matmul(paramsObj.invA[i],displaced),axis=2)
             tp_traj[:,:,i] = rotate
     else:
         sampleObj = Sample(params=paramsObj,Data=None,nbData=None)
