@@ -53,13 +53,13 @@ FT_EMU_ROS2_Node::wrench_callback(const corc_interfaces::msg::DesiredWrench::Sha
 //     };
 //     
 //     // Extract values
-//     Eigen::VectorXd left_joint_pos(left_joints.size());
+//     VX left_joint_pos(left_joints.size());
 //     for (size_t i = 0; i < left_joints.size(); ++i) {
 //         left_joint_pos(i) = msg->position[joint_map[left_joints[i]]];
 //     }
 //     
     // Extract values
-    this->desired_wrench = Eigen::Map<Eigen::VectorXd>(
+    this->desired_wrench = Eigen::Map<VM3>(
                             msg->desired_wrench.data(), 
                             msg->desired_wrench.size()
                             );  
@@ -71,7 +71,7 @@ FT_EMU_ROS2_Node::wrench_callback(const corc_interfaces::msg::DesiredWrench::Sha
 }
 
 
-void FT_EMU_ROS2_Node::publish_task_dynamics(uint16_t repNum,uint16_t sbmvmtNum)
+void FT_EMU_ROS2_Node::publish_task_dynamics(uint16_t repNum,uint16_t sbmvmtNum,VM3 commanded_wrench)
 {
     // Instantiate joint state message
     corc_interfaces::msg::TaskDemo msg;
@@ -85,8 +85,11 @@ void FT_EMU_ROS2_Node::publish_task_dynamics(uint16_t repNum,uint16_t sbmvmtNum)
     msg.name = {
         "x", "y", "z",           // Position (Cartesian)
         "xd", "yd", "zd",        // Velocity (Cartesian)
+        "q1", "q2", "q3",           // Position (Joint)
+        "q1d", "q2d", "q3d",           // Position (Joint)
         "Fx", "Fy", "Fz",        // Forces
         "Mx", "My", "Mz"         // Moments/Torques
+        "Fx_int", "Fy_int", "Fz_int",        // Forces
     };
     
     // Copy position, velocity and torque from M3
@@ -94,14 +97,29 @@ void FT_EMU_ROS2_Node::publish_task_dynamics(uint16_t repNum,uint16_t sbmvmtNum)
         m_Robot->getEndEffPosition().data(),
         m_Robot->getEndEffPosition().data() + m_Robot->getEndEffPosition().size()
     );
-
     msg.velocity.assign(
         m_Robot->getEndEffVelocityFiltered().data(),
         m_Robot->getEndEffVelocityFiltered().data() + m_Robot->getEndEffVelocityFiltered().size()
     );
-    msg.wrench.assign(
+    msg.joint_position.assign(
+        m_Robot->getPosition().data(),
+        m_Robot->getPosition().data() + m_Robot->getPosition().size()
+    );
+    msg.joint_velocity.assign(
+        m_Robot->getVelocity().data(),
+        m_Robot->getVelocity().data() + m_Robot->getVelocity().size()
+    );
+    msg.wrench_m.assign(
         m_Robot->getWrenches().data(),
         m_Robot->getWrenches().data() + m_Robot->getWrenches().size()
+    );
+    msg.wrench_int.assign(
+        m_Robot->getInteractionForce().data(),
+        m_Robot->getInteractionForce().data() + m_Robot->getInteractionForce().size()
+    );
+    msg.wrench_com.assign(
+        commanded_wrench.data(),
+        commanded_wrench.data() + commanded_wrench.size()
     );
 
     // Publish the joint state message
@@ -141,7 +159,7 @@ FT_EMU_ROS2_Node::get_session_param_ints()
     return session_param_ints;
 }
 
-Eigen::VectorXd 
+VM3 
 FT_EMU_ROS2_Node::get_desired_wrench()
 {
     return desired_wrench;
@@ -150,5 +168,5 @@ FT_EMU_ROS2_Node::get_desired_wrench()
 void 
 FT_EMU_ROS2_Node::reset_desired_wrench()
 {
-    desired_wrench = Eigen::VectorXd::Zero(desired_wrench.size());
+    desired_wrench = VM3::Zero();
 }

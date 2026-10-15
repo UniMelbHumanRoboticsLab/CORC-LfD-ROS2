@@ -149,7 +149,7 @@ class M3StandbyState : public FT_EMU_ROS2_State {
     double mass = 0;                       //!< Desired mass to apply: might differ from applied_mass during transition (i.e. setMass)
     double change_mass_rate = 2.;          //!< Rate at which mass will increase/decrease during change mass transition (in kg/s)
     
-    Eigen::VectorXd lastWrenches;
+    VX lastWrenches;
 };
 
 /**
@@ -167,7 +167,7 @@ class M3LockState : public FT_EMU_ROS2_State {
 
    private:
     VM3 X0;
-    double k = 2000.;                //! Impedance proportional gain (spring)
+    double k = 5000.;                //! Impedance proportional gain (spring)
     double d = 3.;                   //! Impedance derivative gain (damper)
 };
 
@@ -235,7 +235,10 @@ class M3ReproLfDState : public FT_EMU_ROS2_State {
 
    private:
    bool start_interaction = false;
-   Eigen::VectorXd desired_wrench;
+   VX desired_wrench = Eigen::VectorXd::Zero(3);
+   VX commanded_wrench = Eigen::VectorXd::Zero(3);
+    const double transition_t = 1.;        //!< Time to apply progressive transition (no friction comp)
+    double change_wrench_rate = 100;          //!< Rate at which mass will increase/decrease during change mass transition (in kg/s)
 };
 
 #endif

@@ -31,13 +31,13 @@ public:
     void wrench_callback(const corc_interfaces::msg::DesiredWrench::SharedPtr  msg);
     void session_param_callback(const corc_interfaces::msg::SessionParam::SharedPtr  msg);
     
-    void publish_task_dynamics(uint16_t repNum,uint16_t sbmvmtNum);
+    void publish_task_dynamics(uint16_t repNum,uint16_t sbmvmtNum,VM3 commanded_wrench);
     void publish_state_var(std::string id,uint16_t varNum);
     
     rclcpp::node_interfaces::NodeBaseInterface::SharedPtr get_interface();
     std::vector<std::string> get_session_param();
     std::vector<uint16_t> get_session_param_ints();
-    Eigen::VectorXd get_desired_wrench();
+    VM3 get_desired_wrench();
     void reset_desired_wrench();
 
 private:
@@ -60,7 +60,7 @@ private:
      std::vector<uint16_t> learnStatus;
      
      // desired commands from LfD
-     Eigen::VectorXd desired_wrench;
+     VM3 desired_wrench;
     
 
 };

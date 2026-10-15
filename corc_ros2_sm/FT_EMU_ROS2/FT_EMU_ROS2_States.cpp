@@ -190,11 +190,12 @@ void M3FTCalibState::entryCode(void) {
     
     calibDone = false;
     std::cout << "Calibrating RFT (keep clear)..." << std::flush;
-    Eigen::VectorXd wrenches = robot->getWrenches();
+    VX wrenches = robot->getUncorrectedWrenches();
     readings = Eigen::ArrayXXd::Zero(NUM_CALIBRATE_READINGS, wrenches.size());
 
     // Take average of the matrices
-    Eigen::VectorXd offsets = Eigen::VectorXd::Zero(readings.cols());
+    VX offsets = VX::Zero(readings.cols());
+    robot->setWrenchesOffset(offsets);
 
     if(spdlog::get_level()<=spdlog::level::debug) {
         rcpputils::fs::path logDir = rcpputils::fs::path("logs/corc_recordings/FT_EMU") / sm->expID / sm->patientID / sm->subID;
@@ -204,10 +205,13 @@ void M3FTCalibState::entryCode(void) {
         // Initialize logger
         stateLogger.initLogger("FT_EMU_Calib_Log", logPath, LogFormat::CSV, true);
         stateLogger.add(running(), "%Time(s)");
-        stateLogger.add(robot->getWrenches(), "W");
+        stateLogger.add(robot->getUncorrectedWrenches(), "W");
         stateLogger.startLogger();
     }
-    robot->startFT_Sensors();
+    if(robot->startFT_Sensors())
+    {
+        spdlog::info("Starting RFT");
+    }
     readingCount = 0;
     std::cout << "Calibrating RFT (keep clear)..." << std::flush;
     std::cout <<  std::endl;
@@ -219,7 +223,8 @@ void M3FTCalibState::duringCode(void) {
         if(iterations()%100==1) {
             std::cout << "." << std::flush;
         }
-        readings.row(readingCount) = robot->getWrenches();
+
+        readings.row(readingCount) = robot->getUncorrectedWrenches();
     }
     else
     {
@@ -230,7 +235,7 @@ void M3FTCalibState::duringCode(void) {
 }
 void M3FTCalibState::exitCode(void) {
     // Take average of the matrices
-    Eigen::VectorXd offsets = Eigen::VectorXd::Zero(readings.cols());
+    VX offsets = VX::Zero(readings.cols());
 
     // Set offsets for crutches
     for (int i = 0; i < readings.cols(); i++) {
@@ -238,15 +243,18 @@ void M3FTCalibState::exitCode(void) {
     }
     spdlog::info("FT Calibration Complete, setting offsets");
     for (int i = 0; i < readings.cols()/6; i++){
-        Eigen::VectorXd cur_offsets = offsets.segment(i*6, 6).transpose();
+        VX cur_offsets = offsets.segment(i*6, 6).transpose();
         spdlog::debug("RFT {} Offset [{}, {}, {}, {}, {}, {}]", i,cur_offsets[0],cur_offsets[1],cur_offsets[2],cur_offsets[3],cur_offsets[4],cur_offsets[5]);
-        if (offsets.segment(i*6, 6).isApprox(Eigen::VectorXd::Zero(6))){
+        if (offsets.segment(i*6, 6).isApprox(VX::Zero(6))){
             spdlog::warn("RFTs may not be connected");
         }
     }
     robot->setWrenchesOffset(offsets);
     spdlog::info("CalibrateState Exit");
-    robot->stopFT_Sensors();
+    if(robot->stopFT_Sensors())
+    {
+        spdlog::info("Stopping RFT");
+    }
 }
 
 /**
@@ -256,16 +264,10 @@ void M3FTCalibState::exitCode(void) {
  
 void M3StandbyState::entryCode(void) {  
     sm->stateID = "standby";
+    mass = 0;
     sm->get_node()->publish_state_var(sm->stateID,0);
-    
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
-//     std::cout << "Press S to decrease mass (-100g), W to increase (+100g)." << std::endl;
-    
-//     lastWrenches = robot->getWrenches();
-//     if(robot->startFT_Sensors())
-//     {
-//         spdlog::info("Starting RFT");
-//     }
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    std::cout << "Press S to decrease mass (-100g), W to increase (+100g)." << std::endl;
     spdlog::info("Current Var: {}. Add Var ('2'). Start Demo ('1'). Start Repro ('3').",sm->varNum);
 }
 void M3StandbyState::duringCode(void) {
@@ -277,18 +279,27 @@ void M3StandbyState::duringCode(void) {
     //Mass controllable through keyboard inputs
     if(robot->keyboard->getS()) {
         mass -=0.2;
+        if(mass<-mass_limit) {
+            mass = -mass_limit;
+        }
+        std::ostringstream oss;
+        oss << std::setprecision(3) << std::fixed << std::showpos;
+        oss <<  "MassReq:"<<  mass         << "\t\t";
+        oss <<  "ForceReq:"<< mass * 9.8   << "\n";
+        std::cout << oss.str() ;
     }
     if(robot->keyboard->getW()) {
         mass +=0.2;
+        //Bound mass to +-10kg
+        if(mass>mass_limit) {
+            mass = mass_limit;
+        }
+        std::ostringstream oss;
+        oss << std::setprecision(3) << std::fixed << std::showpos;
+        oss <<  "MassReq:"<<  mass         << "\t\t";
+        oss <<  "ForceReq:"<< mass * 9.8   << "\n";
+        std::cout << oss.str() ;
     }
-    //Bound mass to +-10kg
-    if(mass>mass_limit) {
-        mass = mass_limit;
-    }
-    if(mass<-mass_limit) {
-        mass = -mass_limit;
-    }
-
     //Calculate effective applied mass based on possible transition (change mass
     sm->MassComp += sign(mass - sm->MassComp)*change_mass_rate*dt();
 
@@ -301,16 +312,6 @@ void M3StandbyState::duringCode(void) {
         //Apply corresponding deweighting force w/o friction comp
         robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
     }
-   
-//     // Check if some sensors are not responding properly every one second
-//     Eigen::VectorXd curWrenches = robot->getWrenches();
-//     if(iterations() % 100 == 99){
-//         bool ok = true;
-//         if (lastWrenches.isApprox(curWrenches)){
-//             ok = false;
-//         }
-//         lastWrenches = curWrenches;
-//     }
     
     if(robot->joystick->isButtonTransition(2)>0 and sm->varNum < 6)
     {
@@ -335,10 +336,6 @@ void M3StandbyState::duringCode(void) {
 void M3StandbyState::exitCode(void) {
     robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
     sm->robotVerbose = false;
-//     if(robot->stopFT_Sensors())
-//     {
-//         spdlog::info("Stopping RFT");
-//     }
 }
 
 /**
@@ -411,8 +408,9 @@ void M3DemoState::entryCode(void) {
     sm->sbmvmtNum = 0;
     spdlog::info("Var {}, Start Rep {} ('2'). End Var {} ('S').",sm->varNum,sm->repNum,sm->varNum);
 }
-void M3DemoState::duringCode(void) {
-
+void M3DemoState::duringCode(void) {    
+    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    
     if(robot->joystick->isButtonTransition(2)>0 and sm->sbmvmtNum <= sm->maxSbmvmt)
     {
         sm->sbmvmtNum = sm->sbmvmtNum+1;
@@ -445,7 +443,7 @@ void M3DemoState::duringCode(void) {
     // publish emu task dynamics before end of sbmvmts to ROS2 network
     if (sm->sbmvmtNum <= sm->maxSbmvmt)
     {
-        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum,VM3::Zero());
     }
     
     if (sm->robotVerbose){
@@ -453,8 +451,8 @@ void M3DemoState::duringCode(void) {
     }
 }
 void M3DemoState::exitCode(void) {
-    // set EE force
     robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    // set EE force
     sm->repNum = 1;
     sm->sbmvmtNum = 0;
     sm->robotVerbose = false;
@@ -474,8 +472,6 @@ void M3LearnState::entryCode(void) {
     sm->get_node()->publish_state_var(sm->stateID,sm->varNum);
     
     sm->learn_finish = false;
-    
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), false);
 }
 void M3LearnState::duringCode(void){ 
     sessionParamInts = sm->get_node()->get_session_param_ints();
@@ -490,10 +486,8 @@ void M3LearnState::duringCode(void){
         sm->learn_success = learn_success_bool;
     }
     
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
 }
 void M3LearnState::exitCode(void) { 
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
     sm->robotVerbose = false;
 
        
@@ -514,9 +508,8 @@ void M3LearnState::exitCode(void) {
 void M3NewTPState::entryCode(void) { 
     sm->stateID = "new_tp";
     sm->get_node()->publish_state_var(sm->stateID,sm->varNum);
-
+    robot->setEndEffForceWithCompensation(VM3::Zero(), false);
     // set EE force
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
     if(robot->startFT_Sensors())
     {
         spdlog::info("Starting RFT");
@@ -526,8 +519,7 @@ void M3NewTPState::entryCode(void) {
     spdlog::info("Var {}. Add TP {}/{} ('2'). Redo Var {} TP ('3').",sm->varNum,sm->sbmvmtNum+1,sm->maxSbmvmt+1,sm->varNum);
 }
 void M3NewTPState::duringCode(void){   
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
-    
+    robot->setEndEffForceWithCompensation(VM3::Zero(), false);
     if(robot->joystick->isButtonTransition(2)>0 and sm->sbmvmtNum <= sm->maxSbmvmt)
     {
         sm->sbmvmtNum = sm->sbmvmtNum+1;
@@ -540,19 +532,19 @@ void M3NewTPState::duringCode(void){
         }
         
         // publish TP
-        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum,VM3::Zero());
     }
     
     if(robot->joystick->isButtonTransition(3)>0 and sm->sbmvmtNum > 0)
     {
         sm->sbmvmtNum = 0;
         sm->lfd_repro_ready = false;
-        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+        sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum,VM3::Zero());
         spdlog::info("Var {}. Add TP {}/{} ('2'). Redo Var {} TP ('R','3'').",sm->varNum,sm->sbmvmtNum+1,sm->maxSbmvmt+1,sm->varNum);
     }
 }
 void M3NewTPState::exitCode(void) { 
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    robot->setEndEffForceWithCompensation(VM3::Zero(), false);
     sm->robotVerbose = false;
     sm->lfd_repro_ready = false;
     sm->sbmvmtNum = 0;
@@ -567,11 +559,14 @@ void M3ReproLfDState::entryCode(void) {
     sm->get_node()->publish_state_var(sm->stateID,sm->varNum);
 
     // set EE force
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    robot->setEndEffForceWithCompensation(VM3::Zero(), true);
     if(robot->startFT_Sensors())
     {
         spdlog::info("Starting RFT");
     }
+    
+    desired_wrench = Eigen::VectorXd::Zero(3);
+    commanded_wrench = Eigen::VectorXd::Zero(3);
     
     sm->repNum = 1;
     sm->sbmvmtNum = 0;
@@ -581,16 +576,49 @@ void M3ReproLfDState::duringCode(void){
     // put this here so we can get the latest information 
     if (start_interaction)
     {
-        // to subscribe to the commanded wrenches
+        // get the current desired wrenches
         desired_wrench = sm->get_node()->get_desired_wrench();
-        if (desired_wrench.size() > 0)
-        {
-            std::cout << std::setprecision(3) << std::fixed << std::showpos;
-            std::cout << "desired_wrench\t=[ " << desired_wrench.transpose() <<" ]\t";
-            std::cout <<  std::endl;
-            std::cout <<  std::noshowpos;
-            robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+
+        //Calculate effective applied wrenches based on transition
+        commanded_wrench[0] += sign(desired_wrench[0] - commanded_wrench[0])*change_wrench_rate/2*dt();
+        commanded_wrench[1] += sign(desired_wrench[1] - commanded_wrench[1])*change_wrench_rate/2*dt();
+        commanded_wrench[2] += sign(desired_wrench[2] - commanded_wrench[2])*change_wrench_rate/2*dt();
+    
+        //If after transitioning dampin time
+        if(running()>transition_t) {
+            //Apply corresponding commanded wrench
+            robot->setEndEffForceWithCompensation(commanded_wrench, true);
         }
+        else {
+            //Apply corresponding deweighting force w/o friction comp
+            robot->setEndEffForceWithCompensation(commanded_wrench, false);
+        }
+        std::cout << std::setprecision(3) << std::fixed << std::showpos;
+        std::cout << "desired_wrench\t=[ " << desired_wrench.transpose() <<" ]\t"<< "commanded_wrench\t=[ " << commanded_wrench.transpose() <<" ]\t";
+        std::cout <<  std::endl;
+        std::cout <<  std::noshowpos;
+    }
+    else
+    {
+        desired_wrench = VM3::Zero();
+        //Calculate effective applied wrenches based on transition
+        commanded_wrench[0] += sign(desired_wrench[0] - commanded_wrench[0])*change_wrench_rate/2.0*dt();
+        commanded_wrench[1] += sign(desired_wrench[1] - commanded_wrench[1])*change_wrench_rate/2.0*dt();
+        commanded_wrench[2] += sign(desired_wrench[2] - commanded_wrench[2])*change_wrench_rate/2.0*dt();
+    
+        //If after transitioning dampin time
+        if(running()>transition_t) {
+            //Apply corresponding commanded wrench
+            robot->setEndEffForceWithCompensation(commanded_wrench, true);
+        }
+        else {
+            //Apply corresponding deweighting force w/o friction comp
+            robot->setEndEffForceWithCompensation(commanded_wrench, false);
+        }
+//         std::cout << std::setprecision(3) << std::fixed << std::showpos;
+//         std::cout << "desired_wrench\t=[ " << desired_wrench.transpose() <<" ]\t"<< "commanded_wrench\t=[ " << commanded_wrench.transpose() <<" ]\t";
+//         std::cout <<  std::endl;
+//         std::cout <<  std::noshowpos;
     }
      
     if(robot->joystick->isButtonTransition(2)>0 and !start_interaction)
@@ -608,14 +636,14 @@ void M3ReproLfDState::duringCode(void){
         spdlog::info("Var {}. Interaction {} Stopped. Start Interaction {} ('2'). End Var {} ('S')",sm->varNum,sm->repNum-1,sm->repNum,sm->varNum);
     }
     
-    sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum);
+    sm->get_node()->publish_task_dynamics(sm->repNum,sm->sbmvmtNum,commanded_wrench);
 
     if (sm->robotVerbose){
         printFullStates();
     }
 }
 void M3ReproLfDState::exitCode(void) { 
-    robot->setEndEffForceWithCompensation(VM3(0,0,sm->MassComp*9.8), true);
+    robot->setEndEffForceWithCompensation(VM3::Zero(), true);
     sm->robotVerbose = false;
     sm->repNum = 1;
     sm->sbmvmtNum = 0;
