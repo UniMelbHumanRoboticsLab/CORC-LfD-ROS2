@@ -4,4 +4,8 @@ uint16 sbmvmt_num
 string[] name
 float64[] position
 float64[] velocity
-float64[] wrench
+float64[] joint_position
+float64[] joint_velocity
+float64[] wrench_m
+float64[] wrench_int
+float64[] wrench_com
