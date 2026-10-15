@@ -1,111 +1,132 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <root>
  <tabbed_widget name="Main Window" parent="main_window">
-  <Tab containers="1" tab_name="tab1">
+  <Tab containers="1" tab_name="tab2">
    <Container>
     <DockSplitter count="1" orientation="-" sizes="1">
-     <DockSplitter count="4" orientation="|" sizes="0.250187;0.250187;0.249438;0.250187">
-      <DockSplitter count="3" orientation="-" sizes="0.333593;0.332814;0.333593">
+     <DockSplitter count="4" orientation="|" sizes="0.249734;0.250797;0.249734;0.249734">
+      <DockSplitter count="4" orientation="-" sizes="0.25039;0.24961;0.25039;0.24961">
        <DockArea name="...">
         <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-29.349576" left="252.847897" right="257.840693" top="26.734533"/>
+         <range bottom="-26.596943" left="3329.615447" right="3331.168017" top="31.012743"/>
          <limitY/>
-         <curve color="#c91a33" name="/j_proc/skeleton_pelvis_t8_NA_y/position"/>
-         <curve color="#0e21ff" name="/j_proc/skeleton_pelvis_t8_NA_y/velocity"/>
+         <curve color="#ff0027" name="/j_proc/skeleton_pelvis_t8_NA_y/position"/>
+         <curve color="#0500ff" name="/j_proc/skeleton_pelvis_t8_NA_y/velocity"/>
         </plot>
        </DockArea>
        <DockArea name="...">
         <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-36.019374" left="252.847897" right="257.840693" top="51.871296"/>
+         <range bottom="-17.912903" left="3329.615447" right="3331.168017" top="32.140115"/>
          <limitY/>
-         <curve color="#ff0003" name="/j_proc/skeleton_right_c7_shoulder_y/position"/>
-         <curve color="#0006ff" name="/j_proc/skeleton_right_c7_shoulder_y/velocity"/>
+         <curve color="#ff1200" name="/j_proc/skeleton_right_c7_shoulder_x/position"/>
+         <curve color="#0800ff" name="/j_proc/skeleton_right_c7_shoulder_x/velocity"/>
         </plot>
        </DockArea>
        <DockArea name="...">
         <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-276.832656" left="252.847897" right="257.840693" top="354.065349"/>
+         <range bottom="-248.417349" left="3329.615447" right="3331.168017" top="270.917661"/>
          <limitY/>
-         <curve color="#ff0000" name="/j_proc/skeleton_right_elbow_z/position"/>
-         <curve color="#1800ff" name="/j_proc/skeleton_right_elbow_z/velocity"/>
+         <curve color="#ff0000" name="/j_proc/skeleton_right_shoulder_z/position"/>
+         <curve color="#0600ff" name="/j_proc/skeleton_right_shoulder_z/velocity"/>
+        </plot>
+       </DockArea>
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="-286.455375" left="3329.615447" right="3331.168017" top="353.401536"/>
+         <limitY/>
+         <curve color="#ff0400" name="/j_proc/skeleton_right_elbow_z/position"/>
+         <curve color="#1400ff" name="/j_proc/skeleton_right_elbow_z/velocity"/>
+        </plot>
+       </DockArea>
+      </DockSplitter>
+      <DockSplitter count="4" orientation="-" sizes="0.25039;0.24961;0.25039;0.24961">
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="-15.982187" left="3329.615447" right="3331.168017" top="14.818434"/>
+         <limitY/>
+         <curve color="#ff0000" name="/j_proc/skeleton_pelvis_t8_NA_x/position"/>
+         <curve color="#0000ff" name="/j_proc/skeleton_pelvis_t8_NA_x/velocity"/>
+        </plot>
+       </DockArea>
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="-39.400150" left="3329.615447" right="3331.168017" top="25.511150"/>
+         <limitY/>
+         <curve color="#ff0007" name="/j_proc/skeleton_right_c7_shoulder_y/position"/>
+         <curve color="#1600ff" name="/j_proc/skeleton_right_c7_shoulder_y/velocity"/>
+        </plot>
+       </DockArea>
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="-101.840475" left="3329.615447" right="3331.168017" top="68.701281"/>
+         <limitY/>
+         <curve color="#ff0023" name="/j_proc/skeleton_right_shoulder_x/position"/>
+         <curve color="#0900ff" name="/j_proc/skeleton_right_shoulder_x/velocity"/>
+        </plot>
+       </DockArea>
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="-286.455375" left="3329.615447" right="3331.168017" top="353.401536"/>
+         <limitY/>
+         <curve color="#ff000e" name="/j_proc/skeleton_right_elbow_y/position"/>
+         <curve color="#1500ff" name="/j_proc/skeleton_right_elbow_z/velocity"/>
+        </plot>
+       </DockArea>
+      </DockSplitter>
+      <DockSplitter count="4" orientation="-" sizes="0.25039;0.24961;0.25039;0.24961">
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="-17.254547" left="3329.615447" right="3331.168017" top="21.605256"/>
+         <limitY/>
+         <curve color="#ff0b00" name="/j_proc/skeleton_pelvis_t8_NA_z/position"/>
+         <curve color="#000fff" name="/j_proc/skeleton_pelvis_t8_NA_z/velocity"/>
+        </plot>
+       </DockArea>
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="0.000000" left="0.000000" right="1.000000" top="1.000000"/>
+         <limitY/>
+        </plot>
+       </DockArea>
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="-88.714086" left="3329.615447" right="3331.168017" top="134.227229"/>
+         <limitY/>
+         <curve color="#ff0012" name="/j_proc/skeleton_right_shoulder_y/position"/>
+         <curve color="#0f00ff" name="/j_proc/skeleton_right_shoulder_y/velocity"/>
+        </plot>
+       </DockArea>
+       <DockArea name="...">
+        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
+         <range bottom="0.000000" left="0.000000" right="1.000000" top="1.000000"/>
+         <limitY/>
         </plot>
        </DockArea>
       </DockSplitter>
       <DockSplitter count="3" orientation="-" sizes="0.333593;0.332814;0.333593">
        <DockArea name="...">
         <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-16.755968" left="252.847897" right="257.840693" top="21.953411"/>
+         <range bottom="0.000000" left="3329.615447" right="3331.168017" top="0.000000"/>
          <limitY/>
-         <curve color="#b41f2d" name="/j_proc/skeleton_pelvis_t8_NA_x/position"/>
-         <curve color="#273ed6" name="/j_proc/skeleton_pelvis_t8_NA_x/velocity"/>
+         <curve color="#d62728" name="/j_proc/header/stamp/sec"/>
         </plot>
        </DockArea>
        <DockArea name="...">
         <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-217.857156" left="252.847897" right="257.840693" top="298.009143"/>
+         <range bottom="-0.054625" left="3329.615447" right="3331.168017" top="2.239625"/>
          <limitY/>
-         <curve color="#ff0700" name="/j_proc/skeleton_right_shoulder_z/position"/>
-         <curve color="#0003ff" name="/j_proc/skeleton_right_shoulder_z/velocity"/>
+         <curve color="#ff0700" name="/w_proc/emu_x/effort"/>
+         <curve color="#00ff01" name="/w_proc/emu_y/effort"/>
+         <curve color="#1000ff" name="/w_proc/emu_z/effort"/>
         </plot>
        </DockArea>
        <DockArea name="...">
         <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-99.080052" left="252.847897" right="257.840693" top="98.202048"/>
+         <range bottom="-0.129089" left="3329.615447" right="3331.168017" top="2.246355"/>
          <limitY/>
-         <curve color="#ff1d00" name="/j_proc/skeleton_right_elbow_y/position"/>
-         <curve color="#1200ff" name="/j_proc/skeleton_right_elbow_y/velocity"/>
-        </plot>
-       </DockArea>
-      </DockSplitter>
-      <DockSplitter count="3" orientation="-" sizes="0.333593;0.332814;0.333593">
-       <DockArea name="...">
-        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-28.274105" left="252.847897" right="257.840693" top="22.007009"/>
-         <limitY/>
-         <curve color="#f14c60" name="/j_proc/skeleton_pelvis_t8_NA_z/position"/>
-         <curve color="#0702ff" name="/j_proc/skeleton_pelvis_t8_NA_z/velocity"/>
-        </plot>
-       </DockArea>
-       <DockArea name="...">
-        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-86.310764" left="252.847897" right="257.840693" top="91.374466"/>
-         <limitY/>
-         <curve color="#ff0011" name="/j_proc/skeleton_right_shoulder_x/position"/>
-         <curve color="#0400ff" name="/j_proc/skeleton_right_shoulder_x/velocity"/>
-        </plot>
-       </DockArea>
-       <DockArea name="...">
-        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="0.000000" left="252.847897" right="257.840693" top="10.000000"/>
-         <limitY max="10" min="0"/>
-         <curve color="#1f77b4" name="/j_proc/header/stamp/sec"/>
-        </plot>
-       </DockArea>
-      </DockSplitter>
-      <DockSplitter count="3" orientation="-" sizes="0.333593;0.332814;0.333593">
-       <DockArea name="...">
-        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-31.219024" left="252.847897" right="257.840693" top="31.197516"/>
-         <limitY/>
-         <curve color="#cf1b17" name="/j_proc/skeleton_right_c7_shoulder_x/position"/>
-         <curve color="#0030ff" name="/j_proc/skeleton_right_c7_shoulder_x/velocity"/>
-        </plot>
-       </DockArea>
-       <DockArea name="...">
-        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-103.581246" left="252.847897" right="257.840693" top="141.958234"/>
-         <limitY/>
-         <curve color="#ff002a" name="/j_proc/skeleton_right_shoulder_y/position"/>
-         <curve color="#0300ff" name="/j_proc/skeleton_right_shoulder_y/velocity"/>
-        </plot>
-       </DockArea>
-       <DockArea name="...">
-        <plot flip_x="false" flip_y="false" line_width="1.0" mode="TimeSeries">
-         <range bottom="-0.167128" left="252.847897" right="257.840693" top="2.300899"/>
-         <limitY/>
-         <curve color="#1f77b4" name="/j_proc/skeleton_pelvis_t8_NA_x/effort"/>
-         <curve color="#d62728" name="/j_proc/skeleton_pelvis_t8_NA_y/effort"/>
-         <curve color="#1ac938" name="/j_proc/skeleton_pelvis_t8_NA_z/effort"/>
+         <curve color="#ff0f00" name="/w_proc/lfd_x/effort"/>
+         <curve color="#00ff09" name="/w_proc/lfd_y/effort"/>
+         <curve color="#2400ff" name="/w_proc/lfd_z/effort"/>
         </plot>
        </DockArea>
       </DockSplitter>
@@ -150,7 +171,7 @@
    <max_array_size value="100"/>
    <boolean_strings_to_number value="true"/>
    <remove_suffix_from_strings value="true"/>
-   <selected_topics value="/j_proc"/>
+   <selected_topics value="/j_proc;/w_proc"/>
   </plugin>
   <plugin ID="Serial Port"/>
   <plugin ID="UDP Server"/>
