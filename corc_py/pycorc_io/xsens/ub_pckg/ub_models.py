@@ -48,7 +48,7 @@ def xsens_ub_ros_12dof(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: fl
         L.append(rbt.RevoluteMDH(d=0,a=0,alpha=-np.pi/2,offset=-np.pi/2,name='wrist_dev'))
 
         xsens = rbt.DHRobot(L,name="ub")
-        xsens.base=SE3([-0.5,-0.5,-0.5]) * SE3(SO3.Rz(np.pi/2))
+        xsens.base=SE3([0.80,-0.09,-0.5]) * SE3(SO3.Rz(np.pi/2))
         
         #Add hand transformation (tool) to match XSENS model wrist offset
         xsens.tool= SE3([0,-ha_l,0]) * SE3(SO3.Rx(np.pi))#*SE3(SO3.Rx(0)) # for intrinsic rotation (rotation about local axis), always use post multiply
@@ -71,7 +71,7 @@ def xsens_ub_ros_12dof(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: fl
         xsens = rbt.DHRobot(L)
 
         # #Add hand transformation (tool) to match XSENS model wrist offset
-        xsens.base=SE3([-0.5,-0.5,-0.5]) * SE3(SO3.Rz(np.pi/2))
+        xsens.base=SE3([0.80,-0.09,-0.5]) * SE3(SO3.Rz(np.pi/2))
         xsens.tool=SE3([0,-ha_l,0])* SE3(SO3.Rz(np.pi))#*SE3(SO3.Rx(0))* # for intrinsic rotation (rotation about local axis), always use post multiply
     return xsens
 def emu(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: float = 0, m_fa: float = 0,ft_offsets: dict = {}, shoulder_aa_offset:np.array = np.array([0,0]), arm_side:str = "right") -> rbt.Robot:
@@ -116,7 +116,7 @@ def emu(torso:float,clav:float,ua_l: float, fa_l: float, ha_l: float, m_ua: floa
         fa_link.append(rbt.RevoluteMDH(d=-fa_offsets[1],a=0,alpha=np.pi/2,offset=np.pi/2,name='elbow_ps'))
 
         fa_rbt = rbt.DHRobot(fa_link,name="fa")
-        fa_rbt.base= SE3([-0.5,-0.5,-0.5]) * SE3(SO3.Rz(np.pi/2))
+        fa_rbt.base=SE3([0.80,-0.09,-0.5]) * SE3(SO3.Rz(np.pi/2))
         
         #Add hand transformation (tool) to match rft
         fa_rbt.tool= SE3([0,-fa_offsets[0],0]) * SE3(SO3.Rx(-np.pi/2)) * SE3(SO3.Rz(-np.pi/2)) #* SE3(SO3.Rx(0)) # for intrinsic rotation (rotation about local axis), always use post multiply

@@ -120,6 +120,8 @@ class ub():
         self.plot_skeleton(ax,joints_pose)
 
         import matplotlib.colors as mcolors
+        base = SE3.Rt(np.eye(3), np.array([0,0,0]))
+        base.plot(frame="emu", length=0.05, ax=ax,color="k",flo=(0.005,0.005,0.005))
         colors = list(mcolors.TABLEAU_COLORS.values())+list(mcolors.TABLEAU_COLORS.values())
         if show_joint_frames:
             for i,robot_joint_pose in enumerate(joints_pose):
