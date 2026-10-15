@@ -22,6 +22,7 @@ if "CORC-LfD-ROS2" in package_share:
     sys.path.append(workspace_root)
 from corc_py.pycorc_io.package_utils.unpack_json import get_subject_params
 from corc_py.pycorc_io.xsens.ub_pckg.ub import ub
+from corc_py.pycorc_io.corc.emu import emu_robot
 from corc_py.gui.base.pycorc_gui import pycorc_gui
 
 # import virtual environment libraries
@@ -82,7 +83,10 @@ class corc_viz(pycorc_gui):
         # init corc thread and worker
         self.ros_threads[topic] = QThread()
         self.ros_workers[topic] = ros_listener(topic,msg_type)
-    def init_skeleton(self):
+    def init_twins(self):
+        # init emu model
+        self.emu = {
+            }
         # init ub model
         self.skeleton = {
             "right":{},
@@ -92,19 +96,31 @@ class corc_viz(pycorc_gui):
         for side,color in zip(["right","left"],["purple", "orange"]):
             self.skeleton[side]["ub"] = ub(self.body_params,model="emu",arm_side=side)
             ub_segments, ub_ees = self.skeleton[side]["ub"].ub_fkine([0]*12)
-            ub_ees.append(ub_segments[0])
+            # grab the ground for the upper body and plot it once
+            self.init_frame(pos=ub_segments[0].t,rot=ub_segments[0].R*0.1)
             
             body = self.init_line(points=ub_segments.t,color=color)
             ees = [self.init_frame(pos=ee_pose.t,rot=ee_pose.R*0.1) for ee_pose in ub_ees]
             if side == "right":
-                forces = [0] + [self.init_line(points=np.vstack([ee_pose.t, ee_pose.t + np.matmul(ee_pose.R,np.array([0,0,0.1]))]),color="pink") for ee_pose in ub_ees[1:]]
+                forces = [0] + [self.init_line(points=np.vstack([ee_pose.t, ee_pose.t + np.matmul(ee_pose.R,np.array([0,0,0.1]))]),color="yellow") for ee_pose in ub_ees[1:]]
             else:
                 forces = [0 for ee_pose in ub_ees]
             self.skeleton[side]["body"] = body
             self.skeleton[side]["ees"] = ees
             self.skeleton[side]["forces"] = forces
+        # init EMU robot
+        self.emu["emu"] = emu_robot()
+        emu_segments, emu_ees = self.emu["emu"].emu_fkine([0]*4)
+        self.init_frame(pos=emu_segments[0].t,rot=emu_segments[0].R*0.1)
+        
+        body = self.init_line(points=emu_segments.t,color=color)
+        ees = [self.init_frame(pos=ee_pose.t,rot=ee_pose.R*0.1) for ee_pose in emu_ees]
+        forces = [self.init_line(points=np.vstack([ee_pose.t, ee_pose.t + np.matmul(ee_pose.R,np.array([0,0,0.1]))]),color="yellow") for ee_pose in emu_ees]
+        self.emu["body"] = body
+        self.emu["ees"] = ees
+        self.emu["forces"] = forces
     def init_IOs(self):
-        self.init_skeleton()
+        self.init_twins()
         """
         Init IO thread and worker
         """
@@ -172,6 +188,14 @@ class corc_viz(pycorc_gui):
                                 # force_data = force_data - np.array(list(np.matmul(pose.R.T, np.array(weight_comp))) + [0,0,0])
                                 # self.update_line(force,points=np.vstack([pose.t, pose.t + np.matmul(pose.R,force_data[:3])*0.02]))
                                 self.update_line(force,points=np.vstack([pose.t, pose.t + np.array(msg.wrench)*0.02]))
+
+                        emu_segments, emu_ees = self.emu["emu"].emu_fkine(np.array(msg.joint_position))
+                        self.update_line(self.emu["body"],points=emu_segments.t)
+                        
+                        for i,(frame,force,pose) in enumerate(zip(self.emu["ees"],self.emu["forces"],emu_ees)):
+                            self.update_frame(frame,pos=pose.t,rot=pose.R*0.1)
+                            self.update_line(force,points=np.vstack([pose.t, pose.t + np.array(msg.wrench)*0.02]))
+                                
                 self.update_response_label(self.ros_labels[topic],txt)
     """
     Cleanup
