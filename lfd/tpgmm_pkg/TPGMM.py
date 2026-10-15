@@ -349,23 +349,23 @@ class TPGMM:
         GMR for a single sample
         """
         # ===== Vectorized activation weights (priorsOutput) =====
-        diff_in = input_sample - self.MuIn_t  # (g, nbIn)
+        diff_in = input_sample - self.MuIn_t.copy()  # (g, nbIn)
         
         # Quadratic form: diff_in @ SigmaIn_inv @ diff_in.T for each g
-        tmp = np.einsum('gi,gij->gj', diff_in, self.SigmaIn_inv)  # (g, nbIn)
+        tmp = np.einsum('gi,gij->gj', diff_in, self.SigmaIn_inv.copy())  # (g, nbIn)
         quad = np.einsum('gi,gi->g', tmp, diff_in)  # (g,)
         
         # Compute PDF and activation weights
-        pdf_unclip = np.exp(-0.5 * quad) / self.norm  # (g,)
-        weighted_pdf = self.priors * pdf_unclip  # (g,)
+        pdf_unclip = np.exp(-0.5 * quad) / self.norm.copy()  # (g,)
+        weighted_pdf = self.priors.copy() * pdf_unclip  # (g,)
         priorsOutput = np.clip(weighted_pdf, realmin, realmax) # prevent numerical issues
         priorsOutput = priorsOutput / (np.sum(priorsOutput))
         
         # ===== Vectorized conditional means (muTmp) =====
         # muTmp = MuOut + K @ diff_in
         # K: (g, nbOut, nbIn), diff_in: (g, nbIn) -> (g, nbOut)
-        muTmp_t = np.einsum('goj,gj->go', self.K, diff_in)  # (g, nbOut)
-        muTmp = self.MuOut + muTmp_t.T  # (nbOut, g)
+        muTmp_t = np.einsum('goj,gj->go', self.K.copy(), diff_in)  # (g, nbOut)
+        muTmp = self.MuOut.copy() + muTmp_t.T  # (nbOut, g)
         
         # Weighted sum for expected_data
         expected_data = np.einsum('g,og->o', priorsOutput, muTmp)  # (nbOut,)
@@ -376,7 +376,7 @@ class TPGMM:
         muTmp_inner = np.einsum('og,og->g', muTmp, muTmp)  # (g,) - inner product per Gaussian
         
         # SigmaTmp_all: (g, nbOut, nbOut), transpose to (nbOut, nbOut, g)
-        SigmaTmp_t = np.transpose(self.SigmaTmp_all, (1, 2, 0))  # (nbOut, nbOut, g)
+        SigmaTmp_t = np.transpose(self.SigmaTmp_all.copy(), (1, 2, 0))  # (nbOut, nbOut, g)
         # Add scalar inner product (broadcasts to all elements)
         cov_term = SigmaTmp_t + muTmp_inner  # (nbOut, nbOut, g)
         

@@ -8,9 +8,9 @@ np.set_printoptions(
     formatter={'float_kind': lambda x: f"{x:.4f}"}
 )
 import pickle
-sys.path.append(os.path.join(os.path.dirname(__file__)))
-from stats_pkg import compute_central_tendency
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from stats_pkg import compute_central_tendency
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from corc_py.pycorc_io.package_utils.unpack_json import get_subject_file
 from data_process.file_util_pkg import get_raw_data
 from lfd.tpgmm_pkg.TPGMM import TPGMM
@@ -28,12 +28,12 @@ else:
             "num_rep":4,
             "variants":["var_1","var_2","var_3","var_4","var_5","var_6"] #
         }
-        body_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/subject_measurements/{session_data["subject_id"]}')
+        body_path = os.path.join(os.path.dirname(__file__), '../..',f'logs/pycorc_recordings/{session_data["exp_id"]}/subject_measurements/{session_data["subject_id"]}')
         subject_param = get_subject_file(body_path)
         subject_param["sub_id"] = session_data["subject_id"]
         
         for p in range(1,4):
-            subject_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/p{p}/{session_data["subject_id"]}')
+            subject_path = os.path.join(os.path.dirname(__file__), '../..',f'logs/pycorc_recordings/{session_data["exp_id"]}/p{p}/{session_data["subject_id"]}')
             demo_time_per_patient = []
             # grab the times for each demonstration
             for var in session_data["variants"]:

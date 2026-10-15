@@ -1,26 +1,27 @@
 # -*- coding: utf-8 -*-
 
 import sys,os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from data_process.file_util_pkg import load_npy
 from data_visual.plot_pkg import plot_violins
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from stats_pkg import remove_outliers_iqr
-from metrics_pkg import q
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 test_ids = ["val","test"]
 test_cases = ["Seen","Unseen"]
-method_ids = ["recon","recon_lut","gt",]
+method_ids = ["recon","recon_lut","gt"]
 method_names = ["TPGMM","LUT","THERAPIST"]
 subjects = [
     [11,12,13,14,15,16,17,18,19,20,21,22,23,24],
     [11,12,13,14,15,16,17,18,19,20,21,22,23,24],
     [11,12,13,14,15,16,17,18,19,20,21,22,23,24]]
 
+width = 18.33
 secondary_stats = pd.read_csv('figures/secondary_stats.csv')
-for metric_id,metric_name,figwidth in zip(["avg_norm_error_mean","norm_diff_tau_mean","coverage_mean"],[r"$\epsilon$",r"$\Delta\tau_{peak}$", r"$C~(\%)$" ],[7,6.5,4.83]):    
+for metric_id,metric_name,figwidth in zip(["avg_norm_error_mean","norm_diff_tau_mean","coverage_mean"],[r"$\epsilon$",r"$\Delta\tau_{peak}$", r"$C~(\%)$" ],[0.36*width,0.32*width,0.32*width]):    
     metric_labels = []
     for i in test_cases:
         for j in method_names:
@@ -52,7 +53,7 @@ for metric_id,metric_name,figwidth in zip(["avg_norm_error_mean","norm_diff_tau_
                     "num_rep":4,
                     "variants":["var_1","var_2","var_3","var_4","var_5","var_6"] #
                 }
-                subject_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
+                subject_path = os.path.join(os.path.dirname(__file__), '../..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
                 
                 samples = load_npy(f"{subject_path}/repro/{test_id}_processed.npy")
                 samples_df = pd.DataFrame(samples)

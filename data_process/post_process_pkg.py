@@ -12,7 +12,7 @@ import math
 from scipy.signal import butter,bessel, sosfilt_zi, sosfilt
 
 class JointVelEstimatorND:
-    def __init__(self, dim, fs=62.5, fc=10):
+    def __init__(self, dim, fs=62.5, fc=5):
         self.dim = dim
         self.b, self.a = butter(N=2, Wn=fc, btype='low', fs=fs)
         print(f"Order 2 butterworth initialised: b:{self.b} a:{self.a}")

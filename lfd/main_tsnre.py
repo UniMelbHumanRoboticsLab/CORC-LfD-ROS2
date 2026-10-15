@@ -16,7 +16,7 @@ from data_analyse.stats_pkg import compute_central_tendency
 import matplotlib.pyplot as plt
 
 plt_results = True
-retrain = True
+retrain = False
 # retrain = True
 deploy = True
 
@@ -25,7 +25,7 @@ GREEN = '\033[92m'
 RED = '\033[91m'
 RESET = '\033[0m'
 
-p_start = 1
+p_start = 2
 sub_start  = 18
 
 total_monte = 4
@@ -237,7 +237,7 @@ for train_var_num,total_combi in zip([4],[7]):
                                 fig_label=f"{session_data['exp_id']} Val Compare {combi_num}-{sample_num}",
                                 split=1,
                                 legend=False,
-                                figsize=(18.33333*0.393701,8.5*0.393701),
+                                figsize=(18.33333*0.393701,6*0.393701),
                                 color_set="bright",
                             )
                             stats_fig,stats_ax = plot_multi_dim(
@@ -349,7 +349,7 @@ for train_var_num,total_combi in zip([4],[7]):
                                 fig_label=f"{session_data['exp_id']} Test Compare {combi_num}-{sample_num}",
                                 split=4,
                                 legend=False,
-                                figsize=(18.33333*0.393701,18*0.393701),
+                                figsize=(18.33333*0.393701,12*0.393701),
                                 color_set="bright",
                             )
                             stats_fig,stats_ax = plot_multi_dim(

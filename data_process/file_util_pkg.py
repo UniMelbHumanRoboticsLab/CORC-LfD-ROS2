@@ -75,11 +75,38 @@ def valid_test_combis(n=6,num_train=5) -> list[tuple[int, int]]:
             if i not in combi:
                 var_train_combis[f"var_{i}"].append(combi)
     return valid_tests,valid_trains,var_train_combis
-def separate_train_test_val(variant_list,path,num_train=5,num_val=1,num_monte=4):
+def all_test_combis(n=6,num_train=5) -> list[tuple[int, int]]:
+    from itertools import combinations
+    ids = range(1, n + 1)
+    all_numbers = set(ids)
+    valid_tests = []
+    valid_trains = []
+    for combi in combinations(ids, num_train):
+        selected_var = []
+        lvl_subs = []
+        for item in combi:
+            selected_var.append(item)
+            lvl_subs.append(level_sub(item))
+        remaining = all_numbers - set(combi)
+        valid_tests.append(list(remaining))
+        valid_trains.append(list(combi))
+            
+    # valid train combinations for each variation
+    var_train_combis = {}
+    for i in range(1,n+1):
+        var_train_combis[f"var_{i}"] = []
+        for combi in valid_trains:
+            if i not in combi:
+                var_train_combis[f"var_{i}"].append(combi)
+    return valid_tests,valid_trains,var_train_combis
+def separate_train_test_val(variant_list,path,num_train=5,num_val=1,num_monte=4,constrain=False):
     # Given numbers
     numbers = len(variant_list)
-
-    valid_tests,valid_trains,_ = valid_test_combis(numbers,num_train)
+    
+    if constrain:
+        valid_tests,valid_trains,_ = valid_test_combis(numbers,num_train)
+    else:
+        valid_tests,valid_trains,_ = all_test_combis(numbers,num_train)
         
     # iterate through every valid test combination
     for i,test in enumerate(valid_tests):
@@ -138,15 +165,11 @@ def separate_train_test_val(variant_list,path,num_train=5,num_val=1,num_monte=4)
             })
             train_val_df.to_csv(f'{path}/splits/{i}_train_val_{j}.csv', index=False)
 
-        all_numbers = {1, 2, 3, 4, 5, 6}
-        remaining = all_numbers - set(test)
-        print("Train Var: ",remaining)
-        print("Test Var: ",test)
         for sample,val_rep in enumerate(selected_reps.astype('int')):
-            print_text = f"Sample {sample}: "
+            print_text = f"Val Sample {i}-{sample}: "
             for var,rep in zip(train_var,val_rep):
                 print_text += f"{var}-Rep{rep}, "
-            print(print_text,"\n")
+            # print(print_text)
 
 """ compile raw data"""
 def get_raw_data(data_path):

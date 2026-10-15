@@ -9,8 +9,8 @@ np.set_printoptions(
 )
 
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from data_visual.plot_pkg import plot_multi_source_spread,interactive_spread
 
 for p in range(1,4):
@@ -30,7 +30,7 @@ for p in range(1,4):
             "num_rep":4,
             "variants":["var_1","var_2","var_3","var_4","var_5","var_6"] #
         }
-        subject_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
+        subject_path = os.path.join(os.path.dirname(__file__), '../..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
         
         """ init xsens skeleton model """
         q = ['trunk_ie','trunk_aa','trunk_fe',
@@ -75,7 +75,6 @@ for p in range(1,4):
             time_list_sub.append(time_list_var)
             tau_list_sub.append(tau_list_var)
 
-        
         time_list_all.append(time_list_sub)
         tau_list_all.append(tau_list_sub)
 
@@ -83,10 +82,11 @@ for p in range(1,4):
         figwidth=7
     else:
         figwidth=(18.333333-7)/2
-    fig,axs = plot_multi_source_spread(x_list=time_list_all,data_list=tau_list_all,dim=6*14,labels=tau,xtype="time(s)",figwidth=figwidth,datatype="tau",split=4,sharex=False,legend=True,fig_label=f"p{p}")
+    fig,axs = plot_multi_source_spread(x_list=time_list_all,data_list=tau_list_all,dim=6*14,labels=tau,xtype="norm. time",figwidth=figwidth,datatype="tau",split=4,sharex=False,legend=True,fig_label=f"p{p}")
     interactive_spread(fig,axs)
     fig.savefig(f'figures/p{p}.svg')
-# plt.show()
+
+plt.show()
 
     # assert 0 
 

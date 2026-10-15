@@ -1,5 +1,5 @@
 import sys,os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '../..'))
 from data_process.file_util_pkg import load_npy
 from data_analyse.stats_pkg import assign_stars,remove_outliers_iqr
 
@@ -7,7 +7,7 @@ import numpy as np
 np.set_printoptions(suppress=True,precision=4) # suppress scientific notation
 import pandas as pd
 import matplotlib.pyplot as plt
-fontsize = 8
+fontsize = 10
 plt.rcParams.update({'font.size': fontsize})
 
 import scipy.stats as stats
@@ -41,7 +41,7 @@ for metric_id,metric_name in zip(["avg_norm_error_mean","norm_diff_tau_mean","co
                     "subject_id":f"sub{sub}",
                 }
                 
-                subject_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
+                subject_path = os.path.join(os.path.dirname(__file__), '../..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
                 patient_subject_samples = load_npy(f"{subject_path}/repro/{eval_id}_processed.npy")
                 patient_subject_samples_df = pd.DataFrame(patient_subject_samples)
                 
@@ -212,10 +212,10 @@ fig2.set_constrained_layout_pads(
     hspace=0.0
 )
 
-# fig.savefig(f'figures/res_dist.svg')
-# fig2.savefig(f'figures/qq.svg')
-# plt.show()
-# plt.close()
+fig.savefig(f'figures/res_dist.svg')
+fig2.savefig(f'figures/qq.svg')
+plt.show()
+plt.close()
 
 
         

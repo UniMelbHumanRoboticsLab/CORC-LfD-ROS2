@@ -13,6 +13,9 @@ class LookUpTable:
         self.all_data = all_data
         self.all_input_data = all_data[:,0:input_index+1]
         self.all_output_data = all_data[:,input_index+1:]
+        hi = self.all_input_data
+        hi2 = self.all_output_data
+        pass
         
     def search_closest_output(self,time,input_data):
         closest_output = []

@@ -31,7 +31,7 @@ for p in range(p_start,4):
     for sub in range(sub_start,25):
         """ init session parameters and perform train / test / validation spliting"""
         session_data = {
-            "exp_id":"exp1",
+            "exp_id":"exp1_icorr",
             "patient_id":f"p{p}",
             "subject_id":f"sub{sub}",
             "sbmvmt_num":sm_num,
@@ -40,12 +40,11 @@ for p in range(p_start,4):
         }
         subject_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/{session_data["patient_id"]}/{session_data["subject_id"]}')
         
-
         # separate variants for train test and save splits to csv
         # delete existing splits 
         [file.unlink() for file in Path(f'{subject_path}/splits').iterdir() if file.is_file()] 
         create_dir(f'{subject_path}/splits')
-        separate_train_test_val(session_data["variants"],f'{subject_path}',num_train=4)
+        separate_train_test_val(session_data["variants"],f'{subject_path}',num_train=3)
         # assert 0
         """ init xsens skeleton model """
         body_path = os.path.join(os.path.dirname(__file__), '..',f'logs/pycorc_recordings/{session_data["exp_id"]}/subject_measurements/{session_data["subject_id"]}')
@@ -73,7 +72,7 @@ for p in range(p_start,4):
         fc = 10  # cut-off frequency
         fs = 100 # resample frequency
         dt = 1/fs
-        reprocess = True
+        reprocess = False
         plot_sub = False
         for var in session_data["variants"]:
             full_data_dict[var] = {}
@@ -89,24 +88,11 @@ for p in range(p_start,4):
                 print(f"DTW Order: {dtw_order}")
                 np.savetxt(f"{bias_path}/dtw_order.csv", dtw_order, delimiter=',', fmt='%d')
         
-            # # uncomment to remove all processed folders to redo the processing
-            # exist = os.path.exists(f'{subject_path}/{var}/processed/')
-            # import shutil
-            # if exist:
-            #     shutil.rmtree(f'{subject_path}/{var}/processed/', ignore_errors=False)
-            # assert 0
             for n,rep in enumerate(dtw_order):
-                # exist = os.path.exists(f'{subject_path}/{var}/processed/index/UBOIndex{rep}.txt') and os.path.exists(f'{subject_path}/{var}/processed/index/UBOStartEnd{rep}.txt') 
                 exist = os.path.exists(f'{subject_path}/{var}/processed/UBORecord{rep}Log.csv')
 
                 # check if data processed?
                 if exist and not reprocess:
-                    # # uncomment for index removal shortcut
-                    # try:
-                    #     os.remove(f'{subject_path}/{var}/processed/index/UBOIndex{rep}.txt')
-                    #     os.remove(f'{subject_path}/{var}/processed/index/UBOStartEnd{rep}.txt')
-                    # except:
-                    #     print(f"Already removed {subject_path}/{var}/processed/index")    
                     print(f'{subject_path}/{var}/processed/UBORecord{rep}Log.csv Processed')
                     full_df = pd.read_csv(f'{subject_path}/{var}/processed/UBORecord{rep}Log.csv')
                     print(f"Num of samples: {full_df.values.shape[0]}")
@@ -336,42 +322,6 @@ for p in range(p_start,4):
             split_plot_all(session_data["variants"],time_list,tau_traj_list,rep_label_list,rep_split=session_data["num_rep"],data_type="tau",fig_label=f"tau data {session_data['subject_id']}_{session_data['patient_id']}",plot=True)
             split_plot_all(session_data["variants"],time_list,qdot_traj_list,rep_label_list,rep_split=session_data["num_rep"],data_type="qdot_rad",fig_label=f"qdot_rad data {session_data['subject_id']}_{session_data['patient_id']}",plot=True)
             plt.show()
-            
-# plot_multi_dim(
-#         time_list,
-#         qdot_traj_list,
-#         10,
-#         rep_label_list,
-#         'Time(s)',
-#         "qdot_rad",
-#         sharex=True,
-#         semilogx=False,
-#         fig_label=f"joint angle velocity - rad/s",
-#         show_stats=True)
 
-# plot_multi_dim(
-#         time_list,
-#         sbmvmt_list,
-#         1,
-#         rep_label_list,
-#         'Time(s)',
-#         "sbmvmt",
-#         sharex=True,
-#         semilogx=False,
-#         fig_label="submovement")
-
-# sanity check velocity (zero crossing should match peak positions)
-# for i,(qtraj,qdot_traj) in enumerate(zip(q_traj_list,qdot_traj_list)):
-#     plot_multi_dim(
-#             [time_data_norm,time_data_norm],
-#             [qtraj,qdot_traj],
-#             10,
-#             ["traj","vel"],
-#             'Time(s)',
-#             "qqdot",
-#             sharex=True,
-#             semilogx=False,
-#             fig_label=f"qqdot_{i}",
-#             show_zero_cross=True)
 
 

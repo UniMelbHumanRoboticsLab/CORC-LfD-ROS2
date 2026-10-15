@@ -2,10 +2,12 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 
 fontsize = 8
+res_lim = 0.0
 plt.rcParams.update({'font.size': fontsize})
 import warnings
 warnings.filterwarnings(action="ignore",category=UserWarning)
 from matplotlib.patches import Patch, Rectangle
+import matplotlib.ticker as mticker
 import mplcursors
 from matplotlib.lines import Line2D
 from scipy import stats
@@ -97,7 +99,7 @@ def plot_multi_dim(x_list:list,data_list:list,
         temp = [np.rad2deg(data) for data in data_list]
         data_list = temp
     colors = get_n_colors(len(x_list),split,color_set,shuffle)
-
+    
     # init fig, axes
     if prev_fig is not None and prev_ax is not None:
         fig = prev_fig
@@ -138,6 +140,8 @@ def plot_multi_dim(x_list:list,data_list:list,
                             'elbow_fe','elbow_ps','wrist_fe','wrist_dev']]
         elif dim == 10:
             dim_labels = get_tex_dim_labels(datatype)
+        elif dim == 4:
+            dim_labels = [f"{datatype}_{i}" for i in ["X","Y","Z","Mag"]]
         else:
             dim_labels = []
         
@@ -184,7 +188,7 @@ def plot_multi_dim(x_list:list,data_list:list,
             if datatype == "q2":
                 axs[i].set_ylim(limits[i][0],limits[i][1])
             else:
-                axs[i].set_ylim(limits[0]-0.3*abs(limits[0]),limits[1]+0.3*abs(limits[1]))
+                axs[i].set_ylim(limits[0]-res_lim*abs(limits[0]),limits[1]+res_lim*abs(limits[1]))
     
     # plot actual data
     for i,(x_array_i,data_array_i,label,color) in enumerate(zip(x_list, data_list, labels, colors)):
@@ -264,7 +268,7 @@ def plot_velocity_zero_crossings(time, velocity, ax):
     for t_cross in times:
         ax.axvline(t_cross, color='red', linestyle='-', alpha=0.7)
 """ plot confidence interval with mean and std for n-lists list (each element in the list is a list of  2d arrays)"""
-def plot_stats(time_list:list, data_list:list, fig=None,axs=None,labels:list=[],legend=True,relimit=False,dist="gaussian",split=4,datatype="q",color_set="Set1"):
+def plot_stats(time_list:list, data_list:list, fig=None,axs=None,labels:list=[],legend=True,relimit=False,dist="gaussian",split=4,datatype="q",color_set="Set1",shuffle=False):
     if "rad" in datatype:
         temp = [np.rad2deg(data) for data in data_list]
         data_list = temp
@@ -278,10 +282,23 @@ def plot_stats(time_list:list, data_list:list, fig=None,axs=None,labels:list=[],
                 limits[0] = cur_min
             if cur_max > limits[1]:
                 limits[1] = cur_max
-        for i, ax in enumerate(axs):
-            axs[i].set_ylim(limits[0]-0.1*abs(limits[0]),limits[1]+0.1*abs(limits[1]))
 
-    colors = get_n_colors(len(data_list),split=1,color_set=color_set)
+        ax_limit = axs[0].get_ylim()
+        if ax_limit[0] < limits[0]:
+            limits[0] = ax_limit[0]
+        if ax_limit[1] > limits[1]:
+            limits[1] = ax_limit[1]
+        for i, ax in enumerate(axs):
+            axs[i].set_ylim(limits[0]-res_lim*abs(limits[0]),limits[1]+res_lim*abs(limits[1]))
+        ax_limit = axs[0].get_ylim()
+
+    colors = get_n_colors(len(data_list)*len(data_list[0]),split=split,color_set=color_set,shuffle=shuffle)
+    
+    colors = list(dict.fromkeys(colors))
+    
+    if len(colors) == 1:
+        colors = [colors[0] for i in range(len(data_list))]
+    
     for x,data,color,label in zip(time_list,data_list,colors,labels):
         time = x[0]
         if dist == "gaussian":
@@ -332,7 +349,7 @@ def interactive_plot(fig, axs):
         cursor2.connect("add", lambda sel: sel.annotation.set_backgroundcolor('pink'))
         
     handles, labels = axs[0].get_legend_handles_labels()
-    leg = fig.legend(handles, labels, loc='right', ncol=1, draggable=True,frameon=True,
+    leg = fig.legend(handles, labels, loc='right', ncol=2, draggable=True,frameon=True,
             fontsize='small',
             markerscale=1.5,
             scatterpoints=1)
@@ -436,6 +453,7 @@ def split_plot_all(var_id_list,time_list,data_list,label_list,rep_split=4,data_t
                 axs=ax,
                 labels=[f"{x}" for x in unique_var_id],
                 relimit=False,
+                legend=False,
                 split=rep_split,
                 datatype=data_type
             )
@@ -454,7 +472,7 @@ def plot_multi_source_spread(x_list:list,data_list:list,
     if "rad" in datatype:
         temp = [np.rad2deg(data) for data in data_list]
         data_list = temp
-    colors = get_n_colors(len(labels),split=1)
+    colors = get_n_colors(len(labels),split=1,color_set="tab10")
     labels = get_tex_dim_labels(datatype)
     
     # init fig, axes
@@ -462,8 +480,7 @@ def plot_multi_source_spread(x_list:list,data_list:list,
         fig = prev_fig
         axs = prev_ax
     else:
-        fig = plt.figure(figsize=(figwidth*0.393701,14*0.393701),num=fig_label,layout="constrained")
-        # fig = plt.figure(figsize=figsize,num=fig_label,tight_layout=True)
+        fig = plt.figure(figsize=(figwidth*0.393701,4*0.393701),num=fig_label,layout="constrained")
         fig.canvas.manager.window.wm_geometry(loc)
         
         axs = []
@@ -500,14 +517,14 @@ def plot_multi_source_spread(x_list:list,data_list:list,
                         line, = axs[i*6+j].plot(x_rep, data_rep[:, dim], ls='-',color=colors[dim], alpha=alpha, linewidth=linewidth,picker=5)
                     line.line_id = f"{labels[dim]}.sub{i+11}.Var{j+1}.Rep{k+1}"
        
-    # fig.tight_layout(rect=[0.00, 0, 1, 1]) 
+    fig.tight_layout(rect=[0.00, 0, 1, 1]) 
     return fig,axs
 def interactive_spread(fig, axs):
     handles, labels = axs[0].get_legend_handles_labels()
-    # leg = fig.legend(handles, labels, loc='right', ncol=1, draggable=True,frameon=True,
-    #         fontsize='small',
-    #         markerscale=1.5,
-    #         scatterpoints=1)
+    leg = fig.legend(handles, labels, loc='right', ncol=1, draggable=True,frameon=True,
+            fontsize='small',
+            markerscale=1.5,
+            scatterpoints=1)
     
     for j,ax in enumerate(axs):
         # crs = mplcursors.cursor(ax,hover=2)
@@ -522,7 +539,7 @@ def interactive_spread(fig, axs):
     # Map legend handles to original artists across all axes
     legend_lines = {}
     all_y = []
-    for leghandle, label in zip(handles, labels):
+    for leghandle, label in zip(leg.legend_handles, labels):
         leghandle.set_picker(5)  # Works for both Line2D and Patch objects
         legend_lines[leghandle] = {
             "art":[],
@@ -534,14 +551,14 @@ def interactive_spread(fig, axs):
                 line_id = line.line_id.split(".")
                 if line_id[0] == label:
                     legend_lines[leghandle]["art"].append(line)
-                    if label != r"$\tau_{shoulder,flex-extend}$":
+                    if label != r"$\tau_{\substack{shoulder \\ flex-extend}}~(Nm)$": 
                         line.set_visible(False)
                     else:
                         all_y.append(line._y[:,np.newaxis])
     all_y = np.vstack(all_y)
     limits = np.min(all_y),np.max(all_y)
     for ax in axs:
-        ax.set_ylim(limits[0]-0.3*abs(limits[0]),limits[1]+0.3*abs(limits[1])) 
+        ax.set_ylim(limits[0]-res_lim*abs(limits[0]),limits[1]+res_lim*abs(limits[1])) 
     
     def on_pick(event):
         fig = event.canvas.figure
@@ -562,7 +579,7 @@ def interactive_spread(fig, axs):
                 
                 # reset the axis limits
                 for ax in axs:
-                    ax.set_ylim(limits[0]-0.3*abs(limits[0]),limits[1]+0.3*abs(limits[1]))
+                    ax.set_ylim(limits[0]-res_lim*abs(limits[0]),limits[1]+res_lim*abs(limits[1]))
                 legline.set_alpha(1.0 if vis else 0.2)
                 fig.canvas.draw_idle()
         elif isinstance(legline, Line2D) and legline.get_visible():
@@ -806,14 +823,13 @@ def plot_violins(
                             ]
     else:
         colors = get_n_colors(len(x_labels),split)
-        
         if split != 1:
             temp_colors = colors[::split] + colors[1::split]
             colors=temp_colors
     
     # Init figure
     if prev_fig == None and prev_axs == None:
-        fig = plt.figure(figsize=(figwidth*0.393701,18*0.393701),num=title,layout="compressed")
+        fig = plt.figure(figsize=(figwidth*0.393701,16*0.393701),num=title,layout="compressed")
         
         fig.suptitle(title, fontsize=fontsize,weight="bold")
 
@@ -828,7 +844,9 @@ def plot_violins(
         axs = prev_axs
     
     # Positions for each category
-    positions = np.arange(1, len(x_labels) + 1)
+    thera_labels = [i for i, x in enumerate(x_labels) if x == "THERAPIST"]
+    lfd_labels = [i for i, x in enumerate(x_labels) if x != "THERAPIST"]
+    positions = np.arange(1, len(lfd_labels) + 1)
     
     # remove outliers in all sets
     cleaned_set_data = []
@@ -848,18 +866,27 @@ def plot_violins(
     
     if significance_set == None:
         significance_set = [[] for i in range(len(cleaned_set_data))]
-    # plot each set
+        
     for ax,set_data,ax_title,significances in zip(axs,cleaned_set_data,axis_title,significance_set):
         # set x position
         ax.set_xticks(positions)
         
         # Set ylabel if necessary
-        if figwidth>=7:
+        if figwidth>=6.5:
             ax.set_ylabel(ax_title, fontsize=fontsize)
         
+        # plot each set
+        if title != r"$\Delta\tau_{peak}$":
+            res_lim=0.22
+        else:
+            res_lim=0.15
+            from matplotlib.ticker import MultipleLocator
+            ax.yaxis.set_major_locator(MultipleLocator(0.5))
+            
         # Add padding to y-axis
         limits = [np.min(all_data), np.max(all_data)]
-        ax.set_ylim(limits[0] - data_range * 0.25,limits[1] + data_range * 0.1)
+        ax.set_ylim(limits[0] - data_range * res_lim,limits[1] + data_range * 0.1)
+
         # ax.set_ylim(limits[0],limits[1])
         
         # Add grid
@@ -872,27 +899,24 @@ def plot_violins(
             ax_ylim = list(ax.get_ylim())
             for j,significance in enumerate(significances):
                 if significance != " " and significance_set[0][j] != " ":
-                    if len(set_data)/split % 2 ==0:
-                        j_map = j*(split)
-                    else:
-                        j_map = j*(split+1)
+                    j_map = j*2
                     
-                    p1 = [positions[j_map],limits[0]- data_range * 0.1]
-                    p2 = [positions[j_map+1],limits[0]- data_range * 0.1]
+                    p1 = [positions[j_map],limits[0]- data_range * res_lim]
+                    p2 = [positions[j_map+1],limits[0]- data_range * res_lim]
                     font = {'family': 'serif',
                         'color':  'k',
                         'weight': 'bold',
                         'style': 'italic',
                         'size': 10,
                         }
-                    curlyBrace(fig, ax,p2, p1, 0.05, bool_auto=True, str_text=f"{significance}", color='k', lw=1, int_line_num=1,fontdict=font,axs_lim=[ax_xlim,ax_ylim])
+                    curlyBrace(fig, ax,p1, p2, 0.1, bool_auto=True, str_text=f"{significance}", color='k', lw=1, int_line_num=0.6,fontdict=font,axs_lim=[ax_xlim,ax_ylim])
 
         # fill the split area for different cases
         if split>1:
-            mid_pos = int(len(x_labels)/split)
+            mid_pos = int(len(lfd_labels)/split)
             mid_pos_x = (positions[mid_pos]+positions[mid_pos-1])/2
             ax.fill_betweenx(
-                [limits[0] - data_range * 0.25,limits[1] + data_range * 0.1], 
+                [limits[0] - data_range * res_lim,limits[1] + data_range * 0.1], 
                 mid_pos_x, 
                 positions[-1]+0.5,
                 facecolor='grey', 
@@ -919,140 +943,168 @@ def plot_violins(
                     
         # Draw each violin with manual KDE
         cur_x_labels = []
-        for i, (pos, data, color) in enumerate(zip(positions, set_data, colors)):
-            # Calculate KDE
-            kde = stats.gaussian_kde(data, bw_method=bw_method)
-            
-            # Get data range
-            data_min, data_max = np.min(data), np.max(data)
-            
-            # Get bandwidth for extension
-            bandwidth = np.sqrt(kde.covariance[0, 0])
-            
-            # Create extended evaluation points (smooth tails like seaborn)
-            extend = cut * bandwidth
-            y_eval = np.linspace(data_min - extend, data_max + extend, 1000)
-            
-            # Evaluate KDE density
-            density = kde(y_eval)
-            max_density = np.argmax(density)
-            
-            # # Normalize and scale density for width
-            density = density / density.max() * violin_width
-                        
-            # Plot violin (mirrored density for symmetric appearance)
-            ax.fill_betweenx(
-                y_eval, 
-                pos - density, 
-                pos + density,
-                facecolor=color, 
-                alpha=1, 
-                edgecolor='black', 
-                linewidth=1.5,
-                zorder=1
-            )
-            
-            # Add median line
-            if show_central_tendency:
-                # median = np.median(data)
-                # ax.plot([pos - 0.04, pos + 0.04], 
-                #        [median, median], 
-                #        color='orange', 
-                #        linewidth=2, 
-                #        zorder=3)
-                ax.scatter(pos, np.mean(data) , color='white', s=20, zorder=3, 
-                      marker='D', edgecolors='black', linewidths=1.5)
-                # ax.scatter(pos, y_eval[max_density] , color='green', s=40, zorder=3, 
-                #       marker='o', edgecolors='black', linewidths=1.5)
+        for i, (data, color,x_set) in enumerate(zip(set_data, colors,x_labels)):
+            if i in lfd_labels:
+                pos_index = lfd_labels.index(i)
+                pos = positions[pos_index]
+                # Calculate KDE
+                kde = stats.gaussian_kde(data, bw_method=bw_method)
                 
-                tilde = r"$\~{{X}}$"
-                bar = r"$\bar{{X}}$"
-                hat = r"$\hat{{X}}$"
-                cur_x_labels.append(f"{bar}\n{np.mean(data):.2f}\n")#f"{x_labels[i]}\n"++f"{hat}:{y_eval[max_density]:.2f}\n"+f"{tilde}:{median:.2f}")
-        
-            # Add points arranged as horizontal histogram
-            if show_points:
-                # Create bins along y-axis
-                bin_edges = np.linspace(data_min - extend, data_max + extend, 26)
+                # Get data range
+                data_min, data_max = np.min(data), np.max(data)
                 
-                # Assign each data point to a bin
-                bin_indices = np.digitize(data, bin_edges)
+                # Get bandwidth for extension
+                bandwidth = np.sqrt(kde.covariance[0, 0])
                 
-                # Process each bin
-                for bin_idx in range(1, len(bin_edges)):
-                    # Get points in this bin
-                    mask = bin_indices == bin_idx
-                    y_in_bin = data[mask]
-                    n_points = len(y_in_bin)
-                    
-                    if n_points > 0:
-                        # Calculate bin center for y-position
-                        bin_center = (bin_edges[bin_idx-1] + bin_edges[bin_idx]) / 2
-                        
-                        # Calculate width based on selected mode
-                        # Use KDE density at this y-value
-                        bin_density = kde(bin_center)[0]
-                        max_density = kde(y_eval).max()
-                        width_scale = (bin_density / max_density) * violin_width
-                        
-                        # Arrange points horizontally within the bin
-                        if n_points == 1:
-                            # Single point at center
-                            x_positions = [pos]
-                        else:
-                            # Distribute points evenly across the width
-                            x_positions = np.linspace(
-                                pos - width_scale,
-                                pos ,
-                                n_points
-                            )
-                        
-                        # Plot points
-                        ax.scatter(x_positions, y_in_bin,
-                                  alpha=0.3, 
-                                  s=10,
-                                  color=colors[i], 
-                                  edgecolors='black', 
-                                  linewidths=0.5,
-                                  zorder=1)
-                        
-            # Add whiskers (quartiles and min/max)
-            if show_whiskers:
-                q1, q3 = np.percentile(data, [25, 75])
-                whisker_min = np.min(data)
-                whisker_max = np.max(data)
+                # Create extended evaluation points (smooth tails like seaborn)
+                extend = cut * bandwidth
+                y_eval = np.linspace(data_min - extend, data_max + extend, 1000)
                 
-                # Main whisker line from min to max
-                ax.plot([pos, pos], [whisker_min, whisker_max], 
-                       color='black', linewidth=1.5, alpha=0.7, zorder=2,
-                       solid_capstyle='round')
+                # Evaluate KDE density
+                density = kde(y_eval)
+                max_density = np.argmax(density)
                 
-                # Min cap
-                ax.plot([pos - 0.04, pos + 0.04], [whisker_min, whisker_min], 
-                       color='black', linewidth=2.5, zorder=2,
-                       solid_capstyle='round')
-                
-                # Max cap
-                ax.plot([pos - 0.04, pos + 0.04], [whisker_max, whisker_max], 
-                       color='black', linewidth=2.5, zorder=2,
-                       solid_capstyle='round')
-                
-                # Quartile patch
-                quartile_box = Rectangle(
-                    xy=(pos - 0.04, q1),  # Bottom-left corner
-                    width=0.08,              # Box width
-                    height=q3 - q1,                        # Box height (Q3 - Q1)
-                    facecolor='black',          # Fill color
-                    alpha=1,              # Transparencys
-                    zorder=2                               # Layer order
+                # # Normalize and scale density for width
+                density = density / density.max() * violin_width
+                            
+                # Plot violin (mirrored density for symmetric appearance)
+                ax.fill_betweenx(
+                    y_eval, 
+                    pos - density, 
+                    pos + density,
+                    facecolor=color, 
+                    alpha=1, 
+                    edgecolor='black', 
+                    linewidth=1.5,
+                    zorder=1
                 )
-                ax.add_patch(quartile_box)
+                
+                # Add median line
+                if show_central_tendency:
+                    # median = np.median(data)
+                    # ax.plot([pos - 0.04, pos + 0.04], 
+                    #        [median, median], 
+                    #        color='orange', 
+                    #        linewidth=2, 
+                    #        zorder=3)
+                    ax.scatter(pos, np.mean(data) , color='white', s=20, zorder=3, 
+                          marker='D', edgecolors='black', linewidths=1.5)
+                    # ax.scatter(pos, y_eval[max_density] , color='green', s=40, zorder=3, 
+                    #       marker='o', edgecolors='black', linewidths=1.5)
+                    
+                    tilde = r"$\~{{X}}$"
+                    bar = r"$\bar{{X}}$"
+                    hat = r"$\hat{{X}}$"
+                    cur_x_labels.append(f"{bar}\n{np.mean(data):.2f}")#f"{x_labels[i]}\n"++f"{hat}:{y_eval[max_density]:.2f}\n"+f"{tilde}:{median:.2f}")
+                # Add points arranged as horizontal histogram
+                if show_points:
+                    # Create bins along y-axis
+                    bin_edges = np.linspace(data_min - extend, data_max + extend, 26)
+                    
+                    # Assign each data point to a bin
+                    bin_indices = np.digitize(data, bin_edges)
+                    
+                    # Process each bin
+                    for bin_idx in range(1, len(bin_edges)):
+                        # Get points in this bin
+                        mask = bin_indices == bin_idx
+                        y_in_bin = data[mask]
+                        n_points = len(y_in_bin)
+                        
+                        if n_points > 0:
+                            # Calculate bin center for y-position
+                            bin_center = (bin_edges[bin_idx-1] + bin_edges[bin_idx]) / 2
+                            
+                            # Calculate width based on selected mode
+                            # Use KDE density at this y-value
+                            bin_density = kde(bin_center)[0]
+                            max_density = kde(y_eval).max()
+                            width_scale = (bin_density / max_density) * violin_width
+                            
+                            # Arrange points horizontally within the bin
+                            if n_points == 1:
+                                # Single point at center
+                                x_positions = [pos]
+                            else:
+                                # Distribute points evenly across the width
+                                x_positions = np.linspace(
+                                    pos - width_scale,
+                                    pos ,
+                                    n_points
+                                )
+                            
+                            # Plot points
+                            ax.scatter(x_positions, y_in_bin,
+                                      alpha=0.3, 
+                                      s=10,
+                                      color=colors[i], 
+                                      edgecolors='black', 
+                                      linewidths=0.5,
+                                      zorder=1)
+                            
+                # Add whiskers (quartiles and min/max)
+                if show_whiskers:
+                    q1, q3 = np.percentile(data, [25, 75])
+                    whisker_min = np.min(data)
+                    whisker_max = np.max(data)
+                    
+                    # Main whisker line from min to max
+                    ax.plot([pos, pos], [whisker_min, whisker_max], 
+                           color='black', linewidth=1.5, alpha=0.7, zorder=2,
+                           solid_capstyle='round')
+                    
+                    # Min cap
+                    ax.plot([pos - 0.04, pos + 0.04], [whisker_min, whisker_min], 
+                           color='black', linewidth=2.5, zorder=2,
+                           solid_capstyle='round')
+                    
+                    # Max cap
+                    ax.plot([pos - 0.04, pos + 0.04], [whisker_max, whisker_max], 
+                           color='black', linewidth=2.5, zorder=2,
+                           solid_capstyle='round')
+                    
+                    # Quartile patch
+                    quartile_box = Rectangle(
+                        xy=(pos - 0.04, q1),  # Bottom-left corner
+                        width=0.08,              # Box width
+                        height=q3 - q1,                        # Box height (Q3 - Q1)
+                        facecolor='black',          # Fill color
+                        alpha=1,              # Transparencys
+                        zorder=2                               # Layer order
+                    )
+                    ax.add_patch(quartile_box)
+            elif i in thera_labels:
+                thera_index = thera_labels.index(i)
+                if thera_index == 0:
+                    # Get data range
+                    data_min, data_max,data_mean = np.min(data), np.max(data),np.mean(data)
+                    ax.fill_betweenx(
+                        [data_min,data_max], 
+                        positions[0]-0.5, 
+                        positions[-1]+0.5,
+                        facecolor=color, 
+                        alpha=1, 
+                        edgecolor=color, 
+                        linewidth=1.5,
+                        zorder=0,
+                    )
+                    ticks = ax.get_yticks()
+                    ymin, ymax = ax.get_ylim()
+                    
+                    visible_ticks = ticks[(ticks >= ymin) & (ticks <= ymax)]
+                    visible_ticks = np.unique(np.append(visible_ticks, data_mean))
+                    ax.set_yticks(visible_ticks)
+                    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.2f'))
+               
+                # ax.set_yticks(ticks)
+                pass
         
         # set the xaxis labels
         if show_central_tendency:
             # for xtick, color in zip(ax.get_xticklabels(), colors):
             #     xtick.set_color(color)
             ax.set_xticklabels(cur_x_labels, rotation=0, ha='center',fontsize=fontsize)
+            ax.tick_params(axis='x', bottom=False, top=False, labelbottom=True)
         else:
             ax.set_xticklabels(x_labels, rotation=0, ha='center')
 
