@@ -4,6 +4,9 @@ log/
 logs/
 experiment_documents/
 pictures/
+data_analyse/tnsre/figures
+data_analyse/icorr/figures
+data_analyse/subject_demographics/figures
 .vscode/c_cpp_properties.json
 .vscode/settings.json
 *.pyc
@@ -12,7 +15,6 @@ robotics-toolbox-python/
 *.nbi
 lfd/tpgmm/tutorial_data/
 corc_venv/
-*.svg
 *.csv
 *.ods
 *.txt
