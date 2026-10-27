@@ -14,6 +14,9 @@ test_ids = ["val","test"]
 test_cases = ["Seen","Unseen"]
 method_ids = ["recon","recon_lut","gt"]
 method_names = ["TPGMM","LUT","THERAPIST"]
+method_names = [{"name":"TPGMM","id":"TPGMM"},
+                {"name":"LUT","id":"LUT"},
+                {"name":"THERAPIST"}]
 subjects = [
     [11,12,13,14,15,16,17,18,19,20,21,22,23,24],
     [11,12,13,14,15,16,17,18,19,20,21,22,23,24],
@@ -22,11 +25,11 @@ subjects = [
 width = 18.33
 secondary_stats = pd.read_csv('figures/secondary_stats.csv')
 for metric_id,metric_name,figwidth in zip(["avg_norm_error_mean","norm_diff_tau_mean","coverage_mean"],[r"$\epsilon$",r"$\Delta\tau_{peak}$", r"$C~(\%)$" ],[0.36*width,0.32*width,0.32*width]):    
-    metric_labels = []
+    method_labels = []
     for i in test_cases:
         for j in method_names:
-            if metric_id != "coverage_mean" or j != "THERAPIST":
-                metric_labels.append(j)
+            if metric_id != "coverage_mean" or j["name"] != "THERAPIST":
+                method_labels.append(j)
 
     cur_metric_all_patients = []
     if metric_id == "avg_norm_error_mean":
@@ -85,26 +88,26 @@ for metric_id,metric_name,figwidth in zip(["avg_norm_error_mean","norm_diff_tau_
     cur_metric_all_patients.insert(0,cur_metric_overall_patient)
 
     # get required stats
-    required_stats = secondary_stats[[f"Seen {metric_name}",f"Unseen {metric_name}"]].values.tolist()
+    required_stats = secondary_stats[["id",f"Seen {metric_name}",f"Unseen {metric_name}"]].values.tolist()
     # plot 
     plot_violins(
         title=metric_name,
         data_list=cur_metric_all_patients,
         axis_num = 4,
-        x_labels=metric_labels,
-        axis_title=["All Personas","Persona 1","Persona 2","Persona 3"],
+        x_labels=method_labels,
+        ax_titles=["All Personas","Persona 1","Persona 2","Persona 3"],
         split=len(test_cases),
         figwidth=figwidth,
         remove_outlier=False,
-        significance_set=required_stats)
+        significance_list=required_stats)
     if metric_id == "avg_norm_error_mean" and "val" in test_ids:
         plot_violins(
             title="Gaussian Numbers",
             data_list=all_patients_gaussian,
             axis_num = 3,
-            x_labels=["gaussian #"],
-            axis_title=["Persona 1","Persona 2","Persona 3"],
+            x_labels=[{"name":"gaussian #","id":"GAUSS"}],
+            ax_titles=["Persona 1","Persona 2","Persona 3"],
             split=1,
             figwidth=figwidth,
-            remove_outlier=False)
+            significance_list=None)
 plt.show()

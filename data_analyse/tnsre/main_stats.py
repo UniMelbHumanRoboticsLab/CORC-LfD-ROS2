@@ -46,7 +46,7 @@ for metric_id,metric_name in zip(["avg_norm_error_mean","norm_diff_tau_mean","co
                 patient_subject_samples_df = pd.DataFrame(patient_subject_samples)
                 
                 if len(patient_subject_samples)>0:
-                    for method_id,method_name in zip(cases,[f"TPGMM","LUT"]):
+                    for method_id,method_name in zip(cases,["TPGMM","LUT"]):
                         mean_metric = np.mean(remove_outliers_iqr(np.array(patient_subject_samples_df[f"{method_id}_{metric_id}"].tolist()))[0])
                         stats_sample = {
                             "patient": f"p{p}",
@@ -139,7 +139,8 @@ for metric_id,metric_name in zip(["avg_norm_error_mean","norm_diff_tau_mean","co
                     parametric=True,marginal=True,alpha=0.05,padjust="holm").round(3)
         post_hoc['p_corr'] = post_hoc['p_corr'].fillna(post_hoc['p_unc'])
         assign_stars(post_hoc,"p_corr")
-        labels = post_hoc["A"] + "-" + post_hoc["B"]
+        contrast = post_hoc['Contrast'].where(post_hoc['patient'] == '-', post_hoc['patient'])
+        labels = contrast + "-" + post_hoc["A"] + "-" + post_hoc["B"]
         post_hoc["Contrast"] = labels
         post_hoc["P-val"] = post_hoc["p_corr"].astype(str) + post_hoc["stars"]
         post_hoc.rename(columns={"dof": "df"}, inplace=True)
@@ -166,10 +167,7 @@ for metric_id,metric_name in zip(["avg_norm_error_mean","norm_diff_tau_mean","co
                 .drop(columns="src_idx")
                 .rename(columns={"metric": "column"})
         )
-        
-        sec_aovT = aov[["Source","stars"]].iloc[[1]].rename(columns={"Source": "id"})
-        sec_phT = post_hoc[["patient","stars"]][4:].rename(columns={"patient": "id"})
-        sec_phT = pd.concat([sec_aovT, sec_phT]).reset_index(drop=True).rename(columns={"stars": col})
+        sec_phT = post_hoc[["Contrast","stars"]][3:].rename(columns={"Contrast": "id"}).reset_index(drop=True).rename(columns={"stars": col})
         
         if i == 0:
             aov_full = aovT[["Category", "column", col]]
@@ -181,9 +179,7 @@ for metric_id,metric_name in zip(["avg_norm_error_mean","norm_diff_tau_mean","co
             fph_full = fph_full[["Stat Test","Category", "column", f"{eval_name} {metric_name}"]]
             
             fph_sec = sec_phT
-
         else:
-            
             aov_full[col] = aovT[col].to_numpy()        
             fph_full[col] = phT[col].to_numpy()        
             fph_sec[col] = sec_phT[col].to_numpy()
@@ -212,8 +208,8 @@ fig2.set_constrained_layout_pads(
     hspace=0.0
 )
 
-fig.savefig(f'figures/res_dist.svg')
-fig2.savefig(f'figures/qq.svg')
+fig.savefig('figures/res_dist.svg')
+fig2.savefig('figures/qq.svg')
 plt.show()
 plt.close()
 

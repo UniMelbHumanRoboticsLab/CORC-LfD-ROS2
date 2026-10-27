@@ -748,12 +748,46 @@ def plot_3d_trajectory(traj_list:list,label_list:list,fig=None,ax=None,label="3D
 #================3D DATA VISUALIZATION END===========================
 
 #================STATS VISUALIZATION=================================
+def plot_significance_line(ax, x1, x2, y, stars='*', line_height=0.05):
+    """
+    Draw a horizontal line with significance stars above it.
+    
+    Parameters:
+    -----------
+    ax : matplotlib.axes.Axes
+        The axes object to plot on
+    x1 : float
+        Starting x-coordinate
+    x2 : float
+        Ending x-coordinate
+    y : float
+        Y-coordinate of the line
+    stars : str
+        Significance indicator ('*', '**', '***', 'ns', etc.)
+    line_height : float
+        Height of the vertical lines at the ends (default: 0.05)
+    
+    Returns:
+    --------
+    None
+    """
+    # Draw horizontal line
+    ax.plot([x1, x2], [y, y], 'k-', linewidth=1.5)
+    
+    # Draw vertical lines at the ends
+    ax.plot([x1, x1], [y - line_height, y], 'k-', linewidth=1.5)
+    ax.plot([x2, x2], [y - line_height, y], 'k-', linewidth=1.5)
+    
+    # Add significance stars in the middle
+    mid_x = (x1 + x2) / 2
+    ax.text(mid_x, y - 3*line_height, stars, ha='center',va='center', fontsize=8, fontweight='bold')
+
 def plot_violins(
     data_list,
     axis_num,
     x_labels=None,
     title="Metric Distribution",
-    axis_title=["Categories"],
+    ax_titles=["Categories"],
     ylabel="Values",
     figwidth=7,
     cut=0.5,
@@ -765,7 +799,7 @@ def plot_violins(
     prev_fig=None,prev_axs=None,
     remove_outlier=True,
     split=1,
-    significance_set = None
+    significance_list = None
 ):
     """
     Create smooth violin plot with matplotlib using manual KDE and extended tails.
@@ -779,7 +813,7 @@ def plot_violins(
         Colors for each category. Can be list of colors or dict mapping categories to colors
     title : str
         Plot title
-    axis_title : str
+    ax_titles : str
         X-axis label
     ylabel : str
         Y-axis label
@@ -805,31 +839,15 @@ def plot_violins(
     --------
     fig, ax : matplotlib figure and axis objects
     """       
-    # Set colors
-    if len(x_labels) == 6:
-        colors = [(1.0, 0.7686274509803922, 0.0),
-                  (1.0, 0.48627450980392156, 0.0),
-                  (0.00784313725490196, 0.24313725490196078, 1.0),
-                  
-                  (1.0, 0.7686274509803922, 0.0),
-                  (1.0, 0.48627450980392156, 0.0),
-                  (0.00784313725490196, 0.24313725490196078, 1.0),]
-    elif len(x_labels) == 4:
-        colors = [(1.0, 0.7686274509803922, 0.0),
-                  (1.0, 0.48627450980392156, 0.0),
-
-                  (1.0, 0.7686274509803922, 0.0),
-                            (1.0, 0.48627450980392156, 0.0)
-                            ]
-    else:
-        colors = get_n_colors(len(x_labels),split)
-        if split != 1:
-            temp_colors = colors[::split] + colors[1::split]
-            colors=temp_colors
+    colors = get_n_colors(len(x_labels),split)
+    if split != 1:
+        temp_colors = colors[::split] + colors[1::split]
+        colors=temp_colors
+        print(colors)
     
     # Init figure
     if prev_fig == None and prev_axs == None:
-        fig = plt.figure(figsize=(figwidth*0.393701,16*0.393701),num=title,layout="compressed")
+        fig = plt.figure(figsize=(figwidth*0.393701,18*0.393701),num=title,layout="compressed")
         
         fig.suptitle(title, fontsize=fontsize,weight="bold")
 
@@ -844,79 +862,73 @@ def plot_violins(
         axs = prev_axs
     
     # Positions for each category
-    thera_labels = [i for i, x in enumerate(x_labels) if x == "THERAPIST"]
-    lfd_labels = [i for i, x in enumerate(x_labels) if x != "THERAPIST"]
+    thera_labels = [i for i, x in enumerate(x_labels) if x['name'] == "THERAPIST"]
+    lfd_labels = [i for i, x in enumerate(x_labels) if x['name'] != "THERAPIST"]
+    lfd_ids = [x['id'] for i, x in enumerate(x_labels) if x['name'] != "THERAPIST"]
     positions = np.arange(1, len(lfd_labels) + 1)
     
     # remove outliers in all sets
-    cleaned_set_data = []
+    cleaned_data_list = []
     for set_data in data_list:
-        cleaned_data_list = []
+        cleaned_set_data = []
         for data in set_data:
             if remove_outlier:
                 cleaned,_,_ = remove_outliers_iqr(data)
             else:
                 cleaned = data
             cleaned = cleaned.flatten()
-            cleaned_data_list.append(cleaned)
-        cleaned_set_data.append(cleaned_data_list)
+            cleaned_set_data.append(cleaned)
+        cleaned_data_list.append(cleaned_set_data)
     # standardize the scale for every axis
-    all_data = np.concatenate([arr for sublist in cleaned_set_data for arr in sublist])
+    all_data = np.concatenate([arr for set_data in cleaned_data_list for arr in set_data])
     data_range = np.max(all_data) - np.min(all_data)
     
-    if significance_set == None:
-        significance_set = [[] for i in range(len(cleaned_set_data))]
+    # set significances
+    if significance_list == None:
+        significances_set = [[] for i in range(len(cleaned_data_list))]
+    else:
+        num_lfd = int(len(lfd_labels)/split)
+        from math import comb
+        num_comparisons = comb(num_lfd, 2)
+        if num_comparisons == 1:
+            significances_set = [np.array(significance_list[i*num_comparisons:(i+1)*num_comparisons:]) for i in range(len(cleaned_data_list))]
+        else:
+            significances_set = [np.array(significance_list[i*num_comparisons:(i+1)*num_comparisons:]) for i in range(len(cleaned_data_list))]
         
-    for ax,set_data,ax_title,significances in zip(axs,cleaned_set_data,axis_title,significance_set):
+    # plot each axis
+    for ax,set_data,ax_title,significances in zip(axs,cleaned_data_list,ax_titles,significances_set):
         # set x position
         ax.set_xticks(positions)
         
         # Set ylabel if necessary
         if figwidth>=6.5:
             ax.set_ylabel(ax_title, fontsize=fontsize)
-        
-        # plot each set
-        if title != r"$\Delta\tau_{peak}$":
-            res_lim=0.22
+                    
+        if r"$C~(\%)$" in title:
+            sig_lim = 0.02
+            res_lim=0.1
+            from matplotlib.ticker import MultipleLocator
+            ax.yaxis.set_major_locator(MultipleLocator(10))
         else:
-            res_lim=0.15
+            sig_lim = 0.025
+            res_lim=0.1
             from matplotlib.ticker import MultipleLocator
             ax.yaxis.set_major_locator(MultipleLocator(0.5))
             
         # Add padding to y-axis
         limits = [np.min(all_data), np.max(all_data)]
-        ax.set_ylim(limits[0] - data_range * res_lim,limits[1] + data_range * 0.1)
+        ax.set_ylim(limits[0] - data_range * res_lim,limits[1] + data_range * 1.2)
 
-        # ax.set_ylim(limits[0],limits[1])
-        
         # Add grid
         ax.yaxis.grid(True, linestyle='--', alpha=0.3, zorder=0)
         ax.set_axisbelow(True)
         
-        # set the significance
-        if len(significances) > 0:
-            ax_xlim = list(ax.get_xlim())
-            ax_ylim = list(ax.get_ylim())
-            for j,significance in enumerate(significances):
-                if significance != " " and significance_set[0][j] != " ":
-                    j_map = j*2
-                    
-                    p1 = [positions[j_map],limits[0]- data_range * res_lim]
-                    p2 = [positions[j_map+1],limits[0]- data_range * res_lim]
-                    font = {'family': 'serif',
-                        'color':  'k',
-                        'weight': 'bold',
-                        'style': 'italic',
-                        'size': 10,
-                        }
-                    curlyBrace(fig, ax,p1, p2, 0.1, bool_auto=True, str_text=f"{significance}", color='k', lw=1, int_line_num=0.6,fontdict=font,axs_lim=[ax_xlim,ax_ylim])
-
         # fill the split area for different cases
         if split>1:
             mid_pos = int(len(lfd_labels)/split)
             mid_pos_x = (positions[mid_pos]+positions[mid_pos-1])/2
             ax.fill_betweenx(
-                [limits[0] - data_range * res_lim,limits[1] + data_range * 0.1], 
+                [limits[0] - data_range * res_lim,limits[1] + data_range *1.2], 
                 mid_pos_x, 
                 positions[-1]+0.5,
                 facecolor='grey', 
@@ -979,23 +991,16 @@ def plot_violins(
                     zorder=1
                 )
                 
-                # Add median line
+                # Add central tendency
                 if show_central_tendency:
-                    # median = np.median(data)
-                    # ax.plot([pos - 0.04, pos + 0.04], 
-                    #        [median, median], 
-                    #        color='orange', 
-                    #        linewidth=2, 
-                    #        zorder=3)
                     ax.scatter(pos, np.mean(data) , color='white', s=20, zorder=3, 
                           marker='D', edgecolors='black', linewidths=1.5)
-                    # ax.scatter(pos, y_eval[max_density] , color='green', s=40, zorder=3, 
-                    #       marker='o', edgecolors='black', linewidths=1.5)
-                    
-                    tilde = r"$\~{{X}}$"
                     bar = r"$\bar{{X}}$"
-                    hat = r"$\hat{{X}}$"
-                    cur_x_labels.append(f"{bar}\n{np.mean(data):.2f}")#f"{x_labels[i]}\n"++f"{hat}:{y_eval[max_density]:.2f}\n"+f"{tilde}:{median:.2f}")
+                    if title != r"$C~(\%)$":
+                        cur_x_labels.append(f"{bar}\n{np.mean(data):.2f}")
+                    else:
+                        cur_x_labels.append(f"{bar}\n{np.mean(data):.1f}")
+                        
                 # Add points arranged as horizontal histogram
                 if show_points:
                     # Create bins along y-axis
@@ -1015,8 +1020,7 @@ def plot_violins(
                             # Calculate bin center for y-position
                             bin_center = (bin_edges[bin_idx-1] + bin_edges[bin_idx]) / 2
                             
-                            # Calculate width based on selected mode
-                            # Use KDE density at this y-value
+                            # Use KDE density at this y-value # Calculate width based on selected mode
                             bin_density = kde(bin_center)[0]
                             max_density = kde(y_eval).max()
                             width_scale = (bin_density / max_density) * violin_width
@@ -1095,9 +1099,20 @@ def plot_violins(
                     visible_ticks = np.unique(np.append(visible_ticks, data_mean))
                     ax.set_yticks(visible_ticks)
                     ax.yaxis.set_major_formatter(mticker.FormatStrFormatter('%.2f'))
-               
-                # ax.set_yticks(ticks)
-                pass
+        
+        # set the significances
+        if significance_list is not None:
+            for i,stars in enumerate(significances[:,1:].T):
+                height_inc = 1
+                for j,(name,star) in enumerate(zip(significances[:,0],stars)):
+                    factors = name.split('-')
+                    pos1 = [positions[k] for k, x in enumerate(lfd_ids) if x == factors[1]][i]
+                    pos2 =[positions[k] for k, x in enumerate(lfd_ids) if x == factors[2]][i]
+                    if "*" not in star:
+                        pass
+                    else:
+                        plot_significance_line(ax,pos1,pos2,limits[1]*(1+height_inc*0.095),star,limits[1]*(sig_lim))
+                        height_inc += 1
         
         # set the xaxis labels
         if show_central_tendency:
@@ -1121,24 +1136,14 @@ def plot_violins(
            Line2D([0], [0], marker='D', color='w', 
                              markerfacecolor='white', markersize=5,
                              markeredgecolor='black', label=f'Mean, {bar}'))
-        x_labels = x_labels[:3]
+        x_labels = x_labels[:int(len(x_labels)/split)]
         for i,x_label in enumerate(x_labels):
             legend_elements.append(
                Line2D([0], [0], marker='s', color='w', 
                                  markerfacecolor=colors[i], markersize=5,
-                                 markeredgecolor='black', label=x_label))
-        # legend_elements.append(
-        #    Line2D([0], [0], marker='o', color='w', 
-        #                      markerfacecolor='green', markersize=8,
-        #                      markeredgecolor='black', label=f'Mode, {hat}'))
-        # legend_elements.append(
-        #     Line2D([0], [0], linestyle='-',linewidth=2, color='orange', label=f'Median, {tilde}')
-        # )
-    # fig.legend(handles=legend_elements,loc='lower center', ncol=6, draggable=True,fontsize=fontsize,
-    #                 markerscale=1.5,)
-    
-    # Tight layout
-    # fig.tight_layout(rect=[0, 0, 1, 1]) 
+                                 markeredgecolor='black', label=x_label["name"]))
+    fig.legend(handles=legend_elements,loc='lower center', ncol=6, draggable=True,fontsize=fontsize,
+                    markerscale=1.5,)
     
     # def on_resize(event):
     #     fig = event.canvas.figure
@@ -1153,10 +1158,10 @@ def plot_violins(
         hspace=0.0
     )
     if r"$\epsilon$" in title:
-        fig.savefig(f'figures/err.svg')
+        fig.savefig('figures/err.svg')
     elif r"$C~(\%)$" in title:
-        fig.savefig(f'figures/cover.svg')
+        fig.savefig('figures/cover.svg')
     else:
-        fig.savefig(f'figures/tau.svg')
+        fig.savefig('figures/tau.svg')
     return fig, ax
 #================STATS VISUALIZATION END=============================

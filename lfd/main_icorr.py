@@ -12,7 +12,7 @@ from data_process.file_util_pkg import compile_train_val_test_data,create_dir
 from data_analyse.stats_pkg import compute_central_tendency
 import matplotlib.pyplot as plt
 
-plt_results = False
+plt_results = True
 deploy = True
 
 GREEN = '\033[92m'
@@ -22,8 +22,8 @@ RESET = '\033[0m'
 
 p_start = 1
 sub_start  = 11
-input_ranges = [range(1,11),range(1,21),range(0,21)]
-input_cases = ["q","qqd","qqdt"]
+input_ranges = [range(0,1),range(1,11),range(1,21),range(0,21)]
+input_cases = ["t","q","qqd","qqdt"]
 
 def save_results(patient_id,subject_id,time_list,gt_list,recon_dict,recon_type,comparators_per_var,id_list,filename):
     compile_data = []
@@ -40,6 +40,15 @@ def save_results(patient_id,subject_id,time_list,gt_list,recon_dict,recon_type,c
             sample[f"recon_lut_{case_}"] = recon_dict[case_][recon_type][i]
         compile_data.append(sample)
     np.save(filename, np.array(compile_data,dtype=dict))
+def get_results(filename):
+    # check if file exists
+    if os.path.isfile(filename):
+        exists = True
+        save_data = np.load(filename,allow_pickle=True).tolist()
+    else:
+        exists = False
+        save_data = []
+    return exists,save_data
 
 for p in range(p_start,4):
     total_time = 0
@@ -146,28 +155,37 @@ for p in range(p_start,4):
                     """
                     perform reconstruction for validation samples
                     """
+                    exists,save_data= get_results(f"{subject_path}/repro/val_{combi_num}_{sample_num}.npy")
+
                     gt_list = []
                     id_list = []
                     time_list = []
                     start = times.perf_counter()
-                    for val_dict,sample in zip(val_list,val_sample_list): 
+                    for i,(val_dict,sample) in enumerate(zip(val_list,val_sample_list)): 
                         full_sample = np.hstack((np.expand_dims(val_dict["time"],axis=1),val_dict["data"]))
                         DataOut = sample.Data[:,lastInputIndex+1:]
                         
                         gt_list.append(DataOut)
                         id_list.append(val_dict["id"])
                         time_list.append(val_dict["time"])
+                        correct = np.linalg.norm(DataOut-save_data[i]['gt']) <= 0 and exists
                         
                         for case_,range_ in zip(input_cases,input_ranges):
-                            DataIn = full_sample[:,range_]
-                            lut = lut_dict[case_]["lut"]
-                            lut_output = lut.search_closest_output(val_dict["time"],DataIn)
-                            lut_dict[case_]["recon"].append(lut_output)
+                            if correct and f"recon_lut_{case_}" in save_data[i]:
+                                lut_dict[case_]["recon"].append(save_data[i][f"recon_lut_{case_}"])
+                            else:
+                                print(f"redoing {case_} for {subject_path}/repro/val_{combi_num}_{sample_num}_{i}")
+                                DataIn = full_sample[:,range_]
+                                lut = lut_dict[case_]["lut"]
+                                lut_output = lut.search_closest_output(val_dict["time"],DataIn)
+                                lut_dict[case_]["recon"].append(lut_output)
                     
                     # save the results
                     if not os.path.isdir(f"{subject_path}/repro"):
                         create_dir(f"{subject_path}/repro")
                     save_results(session_data["patient_id"],session_data["subject_id"],time_list,gt_list,lut_dict,"recon",train_comparators_per_var,id_list,f"{subject_path}/repro/val_{combi_num}_{sample_num}")
+                    
+                        
                     end = times.perf_counter()
                     total_time += (end - start)
                     print(f"Fast Deploy:Elapsed \t= {(end - start):.4f}s")
@@ -187,7 +205,7 @@ for p in range(p_start,4):
                             figsize=(18.33333*0.393701,6*0.393701),
                             color_set="bright",
                         )
-                        for case_,shuffle in zip(input_cases,[5,100,300]):
+                        for case_,shuffle in zip(input_cases,[5,100,300,400]):
                             stats_fig,stats_ax = plot_multi_dim(
                                 x_list=time_list,
                                 data_list=lut_dict[case_]["recon"],
@@ -214,15 +232,17 @@ for p in range(p_start,4):
                             legend=False
                         )
                         interactive_plot(stats_fig,stats_ax)
+
                     """
                     perform reconstruction for test samples
                     """
+                    exists,save_data= get_results(f"{subject_path}/repro/test_{combi_num}_{sample_num}.npy")
                     gt_list = []
                     id_list = []
                     time_list = []
                     var_id_list = []
                     start = times.perf_counter()
-                    for test_dict,sample in zip(test_list,test_sample_list): 
+                    for i,(test_dict,sample) in enumerate(zip(test_list,test_sample_list)): 
                         full_sample = np.hstack((np.expand_dims(test_dict["time"],axis=1),test_dict["data"]))
                         DataOut = sample.Data[:,lastInputIndex+1:]
                         
@@ -231,12 +251,17 @@ for p in range(p_start,4):
                         id_list.append(test_dict["id"])
                         var_id_list.append(sample_id[0])
                         time_list.append(test_dict["time"])
+                        correct = np.linalg.norm(DataOut-save_data[i]['gt']) <= 0 and exists
                         
                         for case_,range_ in zip(input_cases,input_ranges):
-                            DataIn = full_sample[:,range_]
-                            lut = lut_dict[case_]["lut"]
-                            lut_output = lut.search_closest_output(test_dict["time"],DataIn)
-                            lut_dict[case_]["recon_test"].append(lut_output)
+                            if correct and f"recon_lut_{case_}" in save_data[i]:
+                                lut_dict[case_]["recon_test"].append(save_data[i][f"recon_lut_{case_}"])
+                            else:
+                                print(f"redoing {case_} for {subject_path}/repro/test_{combi_num}_{sample_num}_{i}")
+                                DataIn = full_sample[:,range_]
+                                lut = lut_dict[case_]["lut"]
+                                lut_output = lut.search_closest_output(test_dict["time"],DataIn)
+                                lut_dict[case_]["recon_test"].append(lut_output)
                     time_list_per_var,gt_list_per_var,unique_var_id_list = split_plot_all(var_id_list,time_list,gt_list,id_list,rep_split=4,fig_label=f"Test GT {combi_num}-{sample_num}")
                     
                     # get the mean of each test ground truth, and repeat for 4 repetitions
@@ -268,6 +293,7 @@ for p in range(p_start,4):
                     print(f"Fast Deploy:Elapsed \t= {(end - start):.4f}s")
                     total_time += (end - start)
                     
+                    
                     """plot test gt's rep, mean and ci within each variation and their corresponding reconstructions"""
                     if plt_results:
                         stats_fig,stats_ax = plot_multi_dim(
@@ -283,7 +309,7 @@ for p in range(p_start,4):
                             figsize=(18.33333*0.393701,12*0.393701),
                             color_set="bright",
                         )
-                        for case_,shuffle in zip(input_cases,[5,100,300]):
+                        for case_,shuffle in zip(input_cases,[5,100,300,400]):
                             stats_fig,stats_ax = plot_multi_dim(
                                 x_list=time_list,
                                 data_list=lut_dict[case_]["recon_test"],
